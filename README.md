@@ -1,0 +1,211 @@
+# TUI App Launcher
+
+A Terminal User Interface (TUI) application launcher for Linux systems that provides fast, keyboard-driven access to installed applications with fuzzy search and favorites management.
+
+## Features
+
+- **Fast Application Discovery**: Automatically scans system and user application directories
+- **Fuzzy Search**: Find applications quickly with partial name matching
+- **Favorites Management**: Mark frequently used applications as favorites
+- **Keyboard-Driven Interface**: Efficient navigation without mouse dependency
+- **Responsive Design**: Adapts to different terminal sizes
+- **Error Handling**: Graceful handling of missing applications and configuration issues
+
+## Installation
+
+### Using Make (Recommended)
+
+```bash
+# Build and install to /usr/local/bin (requires sudo)
+make install
+
+# Or install to ~/.local/bin (no sudo required)
+make install-user
+```
+
+### Manual Installation
+
+```bash
+# Build the application
+go build -o tui-launcher
+
+# Copy to your preferred location
+sudo cp tui-launcher /usr/local/bin/
+# or
+cp tui-launcher ~/.local/bin/
+```
+
+### From Source
+
+```bash
+git clone <repository-url>
+cd tui-app-launcher
+make build
+```
+
+## Usage
+
+### Starting the Application
+
+```bash
+tui-launcher
+```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑/↓` | Navigate up/down through applications |
+| `Enter` | Launch selected application |
+| `Tab` | Toggle favorite status of selected application |
+| `Backspace` | Delete character from search query |
+| `Ctrl+U` | Clear search query |
+| `Ctrl+L` | Clear error messages |
+| `Ctrl+R` | Refresh application list |
+| `?` | Toggle help screen |
+| `Esc` or `Ctrl+C` | Exit application |
+
+### Search
+
+- Type any characters to search for applications using fuzzy matching
+- Search matches application names, comments, and categories
+- Clear the search query to view your favorites list
+- Favorites appear first in search results
+
+### Favorites Management
+
+- Use `Tab` to add or remove applications from favorites
+- Favorites are displayed by default when no search query is entered
+- Favorites are persisted across application restarts
+- Favorite applications are marked with a ★ symbol
+
+## Configuration
+
+The application stores its configuration in `~/.config/tui-launcher/`:
+
+- `config.json`: Contains favorites list and application settings
+- `launcher.log`: Application logs (with automatic rotation)
+
+### Configuration File Format
+
+```json
+{
+  "favorites": [
+    "Firefox Web Browser",
+    "Visual Studio Code",
+    "Terminal"
+  ]
+}
+```
+
+## Application Discovery
+
+The launcher automatically scans the following directories for `.desktop` files:
+
+- `/usr/share/applications/` (system applications)
+- `/usr/local/share/applications/` (locally installed applications)
+- `~/.local/share/applications/` (user applications)
+
+Applications with `NoDisplay=true` are automatically filtered out.
+
+## Development
+
+### Building
+
+```bash
+# Build for current platform
+make build
+
+# Build with development flags (race detection)
+make build-dev
+
+# Cross-compile for multiple platforms
+make build-all
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Run integration tests only
+make test-integration
+```
+
+### Code Quality
+
+```bash
+# Format code
+make fmt
+
+# Lint code
+make lint
+
+# Check dependencies
+make deps
+```
+
+### Project Structure
+
+```
+├── main.go                     # Entry point and application initialization
+├── Makefile                    # Build and development tasks
+├── internal/
+│   ├── interfaces/             # Core interfaces and data structures
+│   ├── scanner/                # Application discovery and desktop file parsing
+│   ├── search/                 # Fuzzy search functionality
+│   ├── config/                 # Configuration and favorites management
+│   ├── launcher/               # Application launching functionality
+│   ├── logging/                # Logging system with rotation
+│   ├── errors/                 # Error handling and recovery
+│   ├── tui/                    # Terminal user interface (Bubble Tea)
+│   └── integration/            # Integration tests
+└── go.mod                      # Go module definition
+```
+
+## Requirements
+
+- Go 1.21 or later
+- Linux operating system
+- Terminal with ANSI color support (most modern terminals)
+
+## Dependencies
+
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - TUI framework
+
+## Troubleshooting
+
+### Application Won't Start
+
+1. Check that you have the required Go version: `go version`
+2. Ensure all dependencies are installed: `make deps`
+3. Check the log file: `~/.config/tui-launcher/launcher.log`
+
+### Applications Not Found
+
+1. Refresh the application list with `Ctrl+R`
+2. Check that `.desktop` files exist in standard directories
+3. Verify applications are not marked with `NoDisplay=true`
+
+### Favorites Not Persisting
+
+1. Check write permissions for `~/.config/tui-launcher/`
+2. Verify the configuration file format is valid JSON
+3. Check the log file for configuration errors
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run `make test` and `make lint`
+6. Submit a pull request
+
+## License
+
+[Add your license information here]
