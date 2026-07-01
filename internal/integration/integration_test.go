@@ -1258,7 +1258,7 @@ Type=Application`, app.name, app.exec)
 			}
 			
 			// Test getting launch command
-			command, args, err := appLauncher.GetLaunchCommand(app)
+			command, _, err := appLauncher.GetLaunchCommand(app)
 			if err != nil {
 				t.Errorf("Failed to get launch command for %s: %v", app.Name, err)
 				return

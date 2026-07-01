@@ -29,6 +29,7 @@ type FuzzySearcher interface {
 	Search(query string, items []Application) []SearchResult
 	SetItems(items []Application)
 	GetMatchPositions(query string, text string) []int
+	HighlightMatches(text string, matches []int) string
 }
 
 // ConfigManager interface for managing user configuration and favorites

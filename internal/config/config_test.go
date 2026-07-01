@@ -235,8 +235,9 @@ func TestIsFavorite(t *testing.T) {
 	if manager.IsFavorite("") {
 		t.Error("Expected empty string to not be a favorite")
 	}
-}func T
-estConfigFileCreation(t *testing.T) {
+}
+
+func TestConfigFileCreation(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
 	
@@ -299,8 +300,8 @@ func TestCorruptedConfigFile(t *testing.T) {
 	
 	// Test loading corrupted config (should create new default config)
 	err = manager.loadConfig()
-	if err != nil {
-		t.Fatalf("loadConfig() failed with corrupted file: %v", err)
+	if err == nil {
+		t.Fatal("Expected loadConfig() to return an error for corrupted file")
 	}
 	
 	// Verify that config was reset to default

@@ -25,6 +25,11 @@ type Manager struct {
 
 // NewManager creates a new configuration manager
 func NewManager() *Manager {
+	return NewManagerWithLogger(logging.GetGlobalLogger())
+}
+
+// NewManagerWithLogger creates a new configuration manager with a specific logger
+func NewManagerWithLogger(logger *logging.Logger) *Manager {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		// Fallback to current directory if home directory is not accessible
@@ -40,7 +45,7 @@ func NewManager() *Manager {
 		config: &Config{
 			Favorites: make([]string, 0),
 		},
-		logger: logging.GetGlobalLogger(),
+		logger: logger,
 	}
 
 	// Try to load existing configuration
@@ -202,4 +207,6 @@ func (m *Manager) IsFavorite(appName string) bool {
 func (m *Manager) SetConfigPath(path string) {
 	m.configPath = path
 	m.configFile = filepath.Join(path, "config.json")
+	// Reload configuration from the new path
+	_ = m.loadConfig()
 }

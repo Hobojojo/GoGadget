@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ErrorType represents different categories of errors in the application
@@ -80,65 +81,25 @@ func (e *LauncherError) GetUserFriendlyMessage() string {
 // getUserFriendlyLaunchMessage returns user-friendly launch error messages
 func (e *LauncherError) getUserFriendlyLaunchMessage() string {
 	if e.Cause != nil {
-		causeMsg := e.Cause.Error()
+		causeMsg := strings.ToLower(e.Cause.Error())
 
 		// Check for common error patterns and provide friendly messages
 		switch {
-		case contains(causeMsg, "not found in PATH"):
+		case strings.Contains(causeMsg, "not found in path"):
 			return "Application not found or not installed"
-		case contains(causeMsg, "permission denied"):
+		case strings.Contains(causeMsg, "permission denied"):
 			return "Permission denied - check file permissions"
-		case contains(causeMsg, "no such file"):
+		case strings.Contains(causeMsg, "no such file"):
 			return "Application executable not found"
-		case contains(causeMsg, "exec format error"):
+		case strings.Contains(causeMsg, "exec format error"):
 			return "Application format not supported"
-		case contains(causeMsg, "text file busy"):
+		case strings.Contains(causeMsg, "text file busy"):
 			return "Application is currently being updated"
 		default:
 			return fmt.Sprintf("Launch failed: %s", e.Message)
 		}
 	}
 	return e.Message
-}
-
-// contains checks if a string contains a substring (case-insensitive helper)
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr ||
-			(len(s) > len(substr) &&
-				findSubstring(s, substr)))
-}
-
-// findSubstring performs case-insensitive substring search
-func findSubstring(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(s) < len(substr) {
-		return false
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		match := true
-		for j := 0; j < len(substr); j++ {
-			if toLower(s[i+j]) != toLower(substr[j]) {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
-}
-
-// toLower converts a byte to lowercase
-func toLower(b byte) byte {
-	if b >= 'A' && b <= 'Z' {
-		return b + ('a' - 'A')
-	}
-	return b
 }
 
 // NewConfigError creates a new configuration error
