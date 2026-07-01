@@ -274,8 +274,9 @@ func TestSplitExecField(t *testing.T) {
 			}
 		})
 	}
-}func 
-TestValidateApplication(t *testing.T) {
+}
+
+func TestValidateApplication(t *testing.T) {
 	launcher := NewLauncher()
 
 	tests := []struct {

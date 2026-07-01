@@ -168,20 +168,27 @@ func (s *Scanner) SetScanPaths(paths []string) {
 
 // removeDuplicates removes duplicate applications, preferring user applications over system ones
 func (s *Scanner) removeDuplicates(applications []interfaces.Application) []interfaces.Application {
-	seen := make(map[string]interfaces.Application)
+	type appKey struct {
+		name string
+		exec string
+	}
+	seen := make(map[appKey]interfaces.Application)
 
 	for _, app := range applications {
-		key := app.Name + "|" + app.Exec
+		key := appKey{name: app.Name, exec: app.Exec}
 
 		existing, exists := seen[key]
 		if !exists {
 			seen[key] = app
-		} else {
-			// Prefer user applications (in ~/.local/share/applications)
-			if strings.Contains(app.DesktopFile, ".local/share/applications") &&
-				!strings.Contains(existing.DesktopFile, ".local/share/applications") {
-				seen[key] = app
-			}
+			continue
+		}
+
+		// Prefer user applications (in ~/.local/share/applications)
+		isUserApp := strings.Contains(app.DesktopFile, ".local/share/applications")
+		isExistingUserApp := strings.Contains(existing.DesktopFile, ".local/share/applications")
+
+		if isUserApp && !isExistingUserApp {
+			seen[key] = app
 		}
 	}
 

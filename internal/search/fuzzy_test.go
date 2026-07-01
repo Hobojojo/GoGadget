@@ -79,7 +79,7 @@ func TestFuzzySearcher_Search(t *testing.T) {
 		{
 			name:          "Single character",
 			query:         "t",
-			expectedCount: 2,
+			expectedCount: 3, // Terminal, Text Editor, Calculator (app)
 			expectedFirst: "Terminal", // Should score higher due to start position
 			description:   "Single character should match multiple apps",
 		},
@@ -183,7 +183,7 @@ func TestFuzzySearcher_MatchPositions(t *testing.T) {
 			name:            "Scattered matches",
 			query:           "fx",
 			appName:         "Firefox",
-			expectedMatches: []int{0, 5}, // F-irefo-x
+			expectedMatches: []int{0, 6}, // F-irefo-x (index 6 is 'x')
 		},
 	}
 
@@ -216,7 +216,7 @@ func TestFuzzySearcher_EdgeCases(t *testing.T) {
 	apps := []interfaces.Application{
 		{Name: "", Exec: "empty"},
 		{Name: "A", Exec: "single"},
-		{Name: "Special-Chars_Test.App", Exec: "special"},
+		{Name: "Special-Chars.App", Exec: "special"},
 	}
 
 	tests := []struct {
@@ -227,14 +227,14 @@ func TestFuzzySearcher_EdgeCases(t *testing.T) {
 	}{
 		{
 			name:        "Empty app name",
-			query:       "test",
-			expectCount: 0,
+			query:       "chars",
+			expectCount: 1, // Matches "Special-Chars.App", but should skip the empty name one
 			description: "Should handle empty app names gracefully",
 		},
 		{
 			name:        "Single character app",
 			query:       "a",
-			expectCount: 1,
+			expectCount: 2, // "A" (name) and "Special-Chars_Test.App" (contains 'a')
 			description: "Should match single character apps",
 		},
 		{
@@ -401,9 +401,10 @@ func BenchmarkFuzzySearcher_Search(b *testing.B) {
 
 func BenchmarkFuzzySearcher_CalculateScore(b *testing.B) {
 	searcher := NewFuzzySearcher()
+	queryRunes := []rune("firefox")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		searcher.calculateScore("firefox", "firefox web browser")
+		searcher.calculateScore(queryRunes, "firefox web browser")
 	}
 }

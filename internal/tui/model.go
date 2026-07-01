@@ -481,7 +481,7 @@ func (m Model) View() string {
 			// Only highlight if we didn't truncate
 			matches := m.fuzzySearcher.GetMatchPositions(m.searchQuery, app.Name)
 			if len(matches) > 0 {
-				displayName = m.highlightMatches(plainName, matches)
+				displayName = m.fuzzySearcher.HighlightMatches(plainName, matches)
 			}
 		}
 
@@ -711,39 +711,6 @@ func (m *Model) updateFilteredApps() {
 	}
 }
 
-// highlightMatches highlights matching characters in the text
-func (m *Model) highlightMatches(text string, matches []int) string {
-	if len(matches) == 0 {
-		return text
-	}
-
-	runes := []rune(text)
-	if len(runes) == 0 {
-		return text
-	}
-
-	// Create a map for quick lookup of match positions
-	matchMap := make(map[int]bool)
-	for _, pos := range matches {
-		if pos >= 0 && pos < len(runes) {
-			matchMap[pos] = true
-		}
-	}
-
-	var result strings.Builder
-	for i, r := range runes {
-		if matchMap[i] {
-			// Add highlighting for matched character
-			result.WriteString("\033[1;33m") // Bold yellow
-			result.WriteRune(r)
-			result.WriteString("\033[0m") // Reset
-		} else {
-			result.WriteRune(r)
-		}
-	}
-
-	return result.String()
-}
 
 // launchApplication creates a command to launch the selected application
 func (m *Model) launchApplication(app interfaces.Application) tea.Cmd {

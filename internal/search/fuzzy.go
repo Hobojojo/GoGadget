@@ -24,22 +24,56 @@ func NewFuzzySearcher() *FuzzySearcher {
 func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []interfaces.SearchResult {
 	if query == "" {
 		// Return all items with zero score when query is empty
-		results := make([]interfaces.SearchResult, len(items))
-		for i, item := range items {
-			results[i] = interfaces.SearchResult{
+		results := make([]interfaces.SearchResult, 0, len(items))
+		for _, item := range items {
+			if item.Name == "" {
+				continue
+			}
+			results = append(results, interfaces.SearchResult{
 				Application: item,
 				Score:       0,
 				Matches:     []int{},
-			}
+			})
 		}
 		return results
 	}
 
 	var results []interfaces.SearchResult
 	queryLower := strings.ToLower(query)
+	queryRunes := []rune(queryLower)
 
 	for _, item := range items {
-		score, matches := f.calculateScore(queryLower, strings.ToLower(item.Name))
+		if item.Name == "" {
+			continue
+		}
+
+		// Try matching Name (highest priority)
+		score, matches := f.calculateScore(queryRunes, strings.ToLower(item.Name))
+
+		// Try matching Comment if no match in name or to potentially increase score
+		commentScore, _ := f.calculateScore(queryRunes, strings.ToLower(item.Comment))
+		if commentScore > 0 {
+			// If we matched both, take the better score (usually name)
+			// For simplicity and since we only return one set of matches (for the name),
+			// we prioritize name matches but allow finding by comment.
+			if score == 0 {
+				score = commentScore / 2 // Comment matches have lower weight
+				matches = []int{}        // Don't highlight name if we matched comment
+			}
+		}
+
+		// Try matching Categories
+		for _, cat := range item.Categories {
+			catScore, _ := f.calculateScore(queryRunes, strings.ToLower(cat))
+			if catScore > 0 {
+				if score == 0 {
+					score = catScore / 3 // Category matches have lowest weight
+					matches = []int{}
+				}
+				break
+			}
+		}
+
 		if score > 0 {
 			results = append(results, interfaces.SearchResult{
 				Application: item,
@@ -66,15 +100,14 @@ func (f *FuzzySearcher) SetItems(items []interfaces.Application) {
 }
 
 // calculateScore computes the fuzzy match score and character positions
-func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
-	if len(query) == 0 {
+func (f *FuzzySearcher) calculateScore(queryRunes []rune, target string) (int, []int) {
+	if len(queryRunes) == 0 {
 		return 0, []int{}
 	}
 	if len(target) == 0 {
 		return 0, []int{}
 	}
 
-	queryRunes := []rune(query)
 	targetRunes := []rune(target)
 
 	// Track matched positions
@@ -82,38 +115,60 @@ func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
 	score := 0
 	queryIdx := 0
 
-	for targetIdx, targetChar := range targetRunes {
+SEARCH_LOOP:
+	for targetIdx := 0; targetIdx < len(targetRunes); targetIdx++ {
+		targetChar := targetRunes[targetIdx]
 		if queryIdx >= len(queryRunes) {
 			break
 		}
 
 		if queryRunes[queryIdx] == targetChar {
+			// Check if there is a better match later (e.g. at a word boundary)
+			// for the CURRENT query character, but only if we are not at a word boundary now.
+			if !isWordBoundaryOrStart(targetRunes, targetIdx) {
+				// Quick check: can we still match everything if we skip this 'targetChar'?
+				// Actually, we specifically want to know if queryRunes[queryIdx] appears later at a better position.
+				foundBetter := false
+				for nextIdx := targetIdx + 1; nextIdx < len(targetRunes); nextIdx++ {
+					if targetRunes[nextIdx] == queryRunes[queryIdx] && isWordBoundaryOrStart(targetRunes, nextIdx) {
+						foundBetter = true
+						break
+					}
+				}
+
+				if foundBetter {
+					// Also must ensure we can match the REST of the query from that better position or later.
+					qIdx := queryIdx
+					for tIdx := targetIdx + 1; tIdx < len(targetRunes); tIdx++ {
+						if qIdx < len(queryRunes) && targetRunes[tIdx] == queryRunes[qIdx] {
+							qIdx++
+						}
+					}
+					if qIdx == len(queryRunes) {
+						continue SEARCH_LOOP
+					}
+				}
+			}
+
 			matches = append(matches, targetIdx)
 
 			// Base score for character match
-			charScore := 1
+			charScore := 10 // Increase base score to allow better granularity
 
 			// Position weighting bonuses
 			if targetIdx == 0 {
 				// Bonus for matching at start of string
-				charScore += 3
+				charScore += 30
 			} else if targetIdx > 0 && isWordBoundary(targetRunes[targetIdx-1]) {
 				// Bonus for matching at word boundary
-				charScore += 2
+				charScore += 20
 			}
 
 			// Consecutive character bonus
 			if queryIdx > 0 && len(matches) > 1 {
 				prevMatchIdx := matches[len(matches)-2]
 				if targetIdx == prevMatchIdx+1 {
-					charScore += 1
-				}
-			}
-
-			// Case match bonus (if original characters match case)
-			if len(query) > queryIdx && len(target) > targetIdx {
-				if rune(query[queryIdx]) == rune(target[targetIdx]) {
-					charScore += 1
+					charScore += 15
 				}
 			}
 
@@ -130,7 +185,7 @@ func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
 	// Apply length penalty for longer strings to prefer shorter matches
 	lengthPenalty := len(targetRunes) - len(queryRunes)
 	if lengthPenalty > 0 {
-		score -= lengthPenalty / 4 // Mild penalty
+		score -= lengthPenalty
 	}
 
 	return score, matches
@@ -139,6 +194,14 @@ func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
 // isWordBoundary checks if a character represents a word boundary
 func isWordBoundary(r rune) bool {
 	return unicode.IsSpace(r) || r == '-' || r == '_' || r == '.' || r == '/'
+}
+
+// isWordBoundaryOrStart checks if a character is at a word boundary or start of string
+func isWordBoundaryOrStart(runes []rune, idx int) bool {
+	if idx == 0 {
+		return true
+	}
+	return isWordBoundary(runes[idx-1])
 }
 
 // HighlightMatches returns the text with highlighted matching characters
@@ -185,7 +248,8 @@ func (f *FuzzySearcher) GetMatchPositions(query, target string) []int {
 
 	queryLower := strings.ToLower(query)
 	targetLower := strings.ToLower(target)
+	queryRunes := []rune(queryLower)
 
-	_, matches := f.calculateScore(queryLower, targetLower)
+	_, matches := f.calculateScore(queryRunes, targetLower)
 	return matches
 }
