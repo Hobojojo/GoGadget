@@ -74,6 +74,10 @@ tui-launcher
 | `?` | Toggle help screen |
 | `Esc` or `Ctrl+C` | Exit application |
 
+### Mouse Controls
+
+In terminals that support mouse reporting (including the browser preview), click an application to select it, scroll the wheel over the list to navigate one row per notch, or double-click the same application within 400 ms to launch it. Both list columns are supported; clicks on borders, details, blank rows, or help do nothing. Keyboard controls are unchanged. Hold Shift to use your terminal's native text selection instead.
+
 ### Search
 
 - Type any characters to search for applications using fuzzy matching

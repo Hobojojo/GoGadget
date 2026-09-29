@@ -192,6 +192,8 @@ func (m Model) renderHelp() string {
 		"PgUp/PgDn Move one page",
 		"Enter Launch   Alt+1–9 Visible app",
 		"Alt+Enter Force terminal launch",
+		"Click Select   Double-click Launch",
+		"Mouse wheel Navigate/scroll list",
 		"Ctrl+D / Ctrl+Space Favorite",
 		"Tab / Shift+Tab Cycle category",
 		"←/→ Edit cursor   Ctrl+A/E Start/End",

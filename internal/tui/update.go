@@ -15,7 +15,16 @@ import (
 
 // update handles application events; Update adds presentation-only animation.
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Keyboard, resize and data updates break a double-click sequence.
+	// Animation frames are handled separately by Update.
+	if _, mouse := msg.(tea.MouseMsg); !mouse {
+		m.mouseClick = mouseClickState{}
+	}
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		cmd := m.handleMouse(msg, time.Now())
+		return m, cmd
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height

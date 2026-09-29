@@ -42,7 +42,7 @@ func main() {
 	model := tui.NewModel(fuzzySearcher, configManager, appLauncher, appScanner)
 
 	// Create Bubble Tea program
-	program := tea.NewProgram(model, tea.WithAltScreen())
+	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
 	// Run the program
 	logging.Info("Starting TUI interface")

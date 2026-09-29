@@ -34,6 +34,7 @@ type Model struct {
 	isRefreshing      bool
 	cancelScan        context.CancelFunc
 	animations        animationState
+	mouseClick        mouseClickState
 }
 
 // NewModel creates a new TUI model
