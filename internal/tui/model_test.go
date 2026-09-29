@@ -135,6 +135,41 @@ func TestUnicodeSearchInputAndBackspace(t *testing.T) {
 	}
 }
 
+func TestTruncatedNameHighlightsVisibleMatches(t *testing.T) {
+	m := testModel(t, 0)
+	m = updateModel(m, tea.WindowSizeMsg{Width: 40, Height: 12})
+	m.SetApplications([]interfaces.Application{{Name: "Café " + strings.Repeat("long", 15), Exec: "echo"}})
+	for _, r := range "Café" {
+		m = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	view := m.View()
+	if !strings.Contains(view, "\033[1;33m") || !strings.Contains(view, "...") {
+		t.Fatalf("truncated result lost visible highlight: %q", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if strings.HasPrefix(line, "│") && runewidth.StringWidth(stripANSIForTest(line)) != m.width {
+			t.Fatalf("line does not fit %d columns: %q", m.width, line)
+		}
+	}
+}
+
+func stripANSIForTest(text string) string {
+	var out strings.Builder
+	inEscape := false
+	for _, r := range text {
+		if r == '\x1b' {
+			inEscape = true
+		} else if inEscape {
+			if r == 'm' {
+				inEscape = false
+			}
+		} else {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
+}
+
 func TestFavoriteMessageCopiesSelection(t *testing.T) {
 	m := testModel(t, 1)
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})

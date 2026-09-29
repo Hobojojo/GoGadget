@@ -103,11 +103,32 @@ func (m *Manager) saveConfig() error {
 		return errors.NewConfigError("failed to marshal config", err)
 	}
 
-	if err := os.WriteFile(m.configFile, data, 0644); err != nil {
-		return errors.NewConfigError("failed to write config file", err).
+	file, err := os.CreateTemp(m.configPath, ".config-*")
+	if err != nil {
+		return errors.NewConfigError("failed to create temporary config file", err).
 			WithContext("file", m.configFile)
 	}
+	defer os.Remove(file.Name())
 
+	if err := file.Chmod(0644); err != nil {
+		file.Close()
+		return errors.NewConfigError("failed to set config permissions", err)
+	}
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return errors.NewConfigError("failed to write config file", err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return errors.NewConfigError("failed to sync config file", err)
+	}
+	if err := file.Close(); err != nil {
+		return errors.NewConfigError("failed to close config file", err)
+	}
+	if err := os.Rename(file.Name(), m.configFile); err != nil {
+		return errors.NewConfigError("failed to replace config file", err).
+			WithContext("file", m.configFile)
+	}
 	return nil
 }
 

@@ -9,6 +9,29 @@ import (
 	"tui-app-launcher/internal/errors"
 )
 
+func TestSaveConfigReplacesFileAtomically(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	manager := NewManager()
+	before, err := os.Stat(manager.configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.SaveFavorites([]string{"Café"}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(manager.configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(before, after) {
+		t.Fatal("config was overwritten in place rather than replaced")
+	}
+	entries, err := os.ReadDir(manager.configPath)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "config.json" {
+		t.Fatalf("temporary file was not cleaned up: %v, %v", entries, err)
+	}
+}
+
 func TestNewManager(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	manager := NewManager()
