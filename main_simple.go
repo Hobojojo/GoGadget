@@ -1,3 +1,6 @@
+//go:build ignore
+
+// Standalone alternative entry point: go run main_simple.go.
 package main
 
 import (

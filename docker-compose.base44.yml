@@ -1,0 +1,30 @@
+services:
+  launcher:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: .base44/Dockerfile
+    restart: on-failure
+    init: true
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app:ro
+      - go-modules:/home/preview/go
+      - go-build:/home/preview/.cache/go-build
+      - launcher-config:/home/preview/.config
+    environment:
+      TERM: xterm-256color
+    command: ["sh", ".base44/dev.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --max-time 3 http://127.0.0.1:3000/ >/dev/null || { echo 'Browser terminal is not responding'; exit 1; }"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+volumes:
+  go-modules:
+  go-build:
+  launcher-config:

@@ -1,3 +1,6 @@
+//go:build ignore
+
+// Standalone logging diagnostic: go run test_log_creation.go.
 package main
 
 import (

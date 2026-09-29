@@ -1,3 +1,6 @@
+//go:build ignore
+
+// Manual logging diagnostic, excluded from the application and test package.
 package main
 
 import (
