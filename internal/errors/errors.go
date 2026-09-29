@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ErrorType represents different categories of errors in the application
@@ -101,44 +102,9 @@ func (e *LauncherError) getUserFriendlyLaunchMessage() string {
 	return e.Message
 }
 
-// contains checks if a string contains a substring (case-insensitive helper)
+// contains checks for a substring without regard to case.
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr ||
-			(len(s) > len(substr) &&
-				findSubstring(s, substr)))
-}
-
-// findSubstring performs case-insensitive substring search
-func findSubstring(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(s) < len(substr) {
-		return false
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		match := true
-		for j := 0; j < len(substr); j++ {
-			if toLower(s[i+j]) != toLower(substr[j]) {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
-}
-
-// toLower converts a byte to lowercase
-func toLower(b byte) byte {
-	if b >= 'A' && b <= 'Z' {
-		return b + ('a' - 'A')
-	}
-	return b
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 // NewConfigError creates a new configuration error

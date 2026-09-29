@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"tui-app-launcher/internal/search"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
 )
 
 func testModel(t *testing.T, count int) Model {
@@ -102,6 +104,45 @@ func TestErrorRowsKeepSelectionVisible(t *testing.T) {
 	assertVisible(t, m)
 	m = updateModel(m, tea.KeyMsg{Type: tea.KeyCtrlL})
 	assertVisible(t, m)
+}
+
+func TestUnicodeSearchInputAndBackspace(t *testing.T) {
+	m := testModel(t, 0)
+	m.SetApplications([]interfaces.Application{{Name: "Café", Exec: "echo"}})
+	for _, key := range []tea.KeyMsg{{Type: tea.KeyRunes, Runes: []rune("Café")}, {Type: tea.KeyBackspace}} {
+		m = updateModel(m, key)
+	}
+	if m.searchQuery != "Caf" || len(m.filteredApps) != 1 {
+		t.Fatalf("unicode backspace: query %q, matches %d", m.searchQuery, len(m.filteredApps))
+	}
+	if !strings.Contains(m.View(), "Caf") {
+		t.Fatal("search view did not render valid text")
+	}
+	for _, tc := range []struct {
+		text  string
+		width int
+		want  []string
+	}{
+		{"café monde", 5, []string{"café", "monde"}},
+		{"漢字 cafe", 4, []string{"漢字", "cafe"}},
+	} {
+		if got := m.wrapText(tc.text, tc.width); !reflect.DeepEqual(got, tc.want) {
+			t.Fatalf("wrapped %q: %q", tc.text, got)
+		}
+	}
+	if got := runewidth.StringWidth(m.truncateText("漢字 café", 5)); got > 5 {
+		t.Fatalf("truncated text occupies %d columns", got)
+	}
+}
+
+func TestFavoriteMessageCopiesSelection(t *testing.T) {
+	m := testModel(t, 1)
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m.filteredApps[0].Name = "Changed"
+	msg := cmd().(toggleFavoriteMsg)
+	if msg.app.Name != "Application 00" {
+		t.Fatalf("favorite message followed a changed slice: %+v", msg)
+	}
 }
 
 func TestNavigationWithNoApplications(t *testing.T) {

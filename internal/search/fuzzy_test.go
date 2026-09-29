@@ -108,6 +108,27 @@ func TestFuzzySearcher_Search(t *testing.T) {
 	}
 }
 
+func TestSearchesCommentsAndCategories(t *testing.T) {
+	apps := []interfaces.Application{
+		{Name: "Browser", Comment: "Web navigator", Categories: []string{"Network"}},
+		{Name: "Editor", Comment: "Write text", Categories: []string{"Utility", "Graphics"}},
+		{Name: "Navigator", Comment: "Other application"},
+	}
+	searcher := NewFuzzySearcher()
+	for _, tc := range []struct{ query, name string }{
+		{"web", "Browser"}, {"graphics", "Editor"},
+	} {
+		results := searcher.Search(tc.query, apps)
+		if len(results) != 1 || results[0].Application.Name != tc.name || len(results[0].Matches) != 0 {
+			t.Fatalf("search %q: unexpected results %+v", tc.query, results)
+		}
+	}
+	results := searcher.Search("navigator", apps)
+	if len(results) != 2 || results[0].Application.Name != "Navigator" {
+		t.Fatalf("name matches should outrank equivalent metadata matches: %+v", results)
+	}
+}
+
 func TestFuzzySearcher_ScoreRanking(t *testing.T) {
 	searcher := NewFuzzySearcher()
 

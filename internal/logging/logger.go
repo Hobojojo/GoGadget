@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -41,6 +42,7 @@ func (l LogLevel) String() string {
 
 // Logger provides structured logging functionality with rotation
 type Logger struct {
+	mu       sync.Mutex
 	logFile  *os.File
 	logger   *log.Logger
 	logPath  string
@@ -91,11 +93,15 @@ func NewLogger() (*Logger, error) {
 
 // SetLevel sets the minimum logging level
 func (l *Logger) SetLevel(level LogLevel) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.level = level
 }
 
 // Close closes the log file
 func (l *Logger) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.logFile != nil {
 		return l.logFile.Close()
 	}
@@ -104,6 +110,8 @@ func (l *Logger) Close() error {
 
 // log writes a log entry with the specified level
 func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	// Check if we should log this level
 	if level < l.level {
 		return
@@ -220,24 +228,30 @@ func (l *Logger) rotate() error {
 	l.logFile = logFile
 	l.logger = log.New(logFile, "", 0)
 
-	// Log rotation event
-	l.Info("Log file rotated")
+	// Already holding the logger lock when rotation is triggered by a write.
+	l.logger.Print("Log file rotated\n")
 
 	return nil
 }
 
 // GetLogPath returns the path to the current log file
 func (l *Logger) GetLogPath() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.logPath
 }
 
 // SetMaxSize sets the maximum log file size before rotation
 func (l *Logger) SetMaxSize(size int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.maxSize = size
 }
 
 // SetMaxFiles sets the maximum number of rotated files to keep
 func (l *Logger) SetMaxFiles(count int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.maxFiles = count
 }
 
@@ -277,6 +291,8 @@ func (l *Logger) LogShutdown() {
 // MultiWriter creates a writer that writes to both the log file and another writer
 // This is useful for also writing to stderr for debugging
 func (l *Logger) MultiWriter(w io.Writer) io.Writer {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.logFile != nil {
 		return io.MultiWriter(l.logFile, w)
 	}

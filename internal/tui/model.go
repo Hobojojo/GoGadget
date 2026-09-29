@@ -3,10 +3,14 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
+
 	"tui-app-launcher/internal/errors"
 	"tui-app-launcher/internal/interfaces"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
 )
 
 // Model represents the TUI application state
@@ -64,16 +68,23 @@ func (m *Model) truncateText(text string, maxWidth int) string {
 		return ""
 	}
 
-	runes := []rune(text)
-	if len(runes) <= maxWidth {
+	if runewidth.StringWidth(text) <= maxWidth {
 		return text
 	}
-
 	if maxWidth <= 3 {
 		return strings.Repeat(".", maxWidth)
 	}
-
-	return string(runes[:maxWidth-3]) + "..."
+	var result strings.Builder
+	width := 0
+	for _, r := range text {
+		runeWidth := runewidth.RuneWidth(r)
+		if width+runeWidth > maxWidth-3 {
+			break
+		}
+		result.WriteRune(r)
+		width += runeWidth
+	}
+	return result.String() + "..."
 }
 
 // wrapText wraps text to fit within the specified width
@@ -92,13 +103,13 @@ func (m *Model) wrapText(text string, maxWidth int) []string {
 
 	for _, word := range words {
 		// If adding this word would exceed the width, start a new line
-		if currentLine.Len() > 0 && currentLine.Len()+1+len(word) > maxWidth {
+		if currentLine.Len() > 0 && runewidth.StringWidth(currentLine.String())+1+runewidth.StringWidth(word) > maxWidth {
 			lines = append(lines, currentLine.String())
 			currentLine.Reset()
 		}
 
 		// If the word itself is too long, truncate it
-		if len(word) > maxWidth {
+		if runewidth.StringWidth(word) > maxWidth {
 			word = m.truncateText(word, maxWidth)
 		}
 
@@ -216,6 +227,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toggleFavoriteMsg:
 		// Toggle favorite status
 		app := msg.app
+		// Resolve the current favorite state at delivery time, not keypress time.
+		// Other updates may have rebuilt the filtered slice meanwhile.
+		for _, current := range m.applications {
+			if current.Name == app.Name {
+				app.IsFavorite = current.IsFavorite
+				break
+			}
+		}
 		var err error
 
 		if app.IsFavorite {
@@ -318,14 +337,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "tab":
 			if len(m.filteredApps) > 0 && m.selectedIndex < len(m.filteredApps) {
-				selectedApp := &m.filteredApps[m.selectedIndex]
+				selectedApp := m.filteredApps[m.selectedIndex]
 				return m, m.toggleFavorite(selectedApp)
 			}
 			return m, nil
 
 		case "backspace":
 			if len(m.searchQuery) > 0 {
-				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				_, size := utf8.DecodeLastRuneInString(m.searchQuery)
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-size]
 				m.updateFilteredApps()
 			}
 			return m, nil
@@ -351,13 +371,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		default:
-			// Handle regular character input for search
-			if len(msg.String()) == 1 {
-				char := msg.String()
-				// Only accept printable characters
-				if char >= " " && char <= "~" {
-					m.searchQuery += char
-					m.updateFilteredApps()
+			if msg.Type == tea.KeyRunes {
+				for _, r := range msg.Runes {
+					if unicode.IsPrint(r) {
+						m.searchQuery += string(r)
+						m.updateFilteredApps()
+					}
 				}
 			}
 			return m, nil
@@ -404,7 +423,7 @@ func (m Model) View() string {
 	}
 
 	titleLine := "│ " + title
-	padding := m.width - len(titleLine) - 1
+	padding := m.width - runewidth.StringWidth(titleLine) - 1
 	if padding > 0 {
 		titleLine += strings.Repeat(" ", padding)
 	}
@@ -420,22 +439,24 @@ func (m Model) View() string {
 
 	searchDisplay := m.searchQuery
 	if maxSearchWidth > 1 {
-		// If search query is too long, show the end part with ellipsis
-		if len(searchDisplay) > maxSearchWidth-1 {
-			searchDisplay = "..." + searchDisplay[len(searchDisplay)-(maxSearchWidth-4):]
+		if runewidth.StringWidth(searchDisplay)+1 > maxSearchWidth {
+			// Keep a terminal-width-bounded suffix without splitting a UTF-8 rune.
+			runes := []rune(searchDisplay)
+			width := 0
+			start := len(runes)
+			for start > 0 && width+runewidth.RuneWidth(runes[start-1]) <= maxSearchWidth-4 {
+				start--
+				width += runewidth.RuneWidth(runes[start])
+			}
+			searchDisplay = "..." + string(runes[start:])
 		}
 		searchDisplay += cursor
-
-		// Ensure we don't exceed the available width
-		if len(searchDisplay) > maxSearchWidth {
-			searchDisplay = m.truncateText(searchDisplay, maxSearchWidth)
-		}
 	} else {
 		searchDisplay = cursor
 	}
 
 	searchLine := fmt.Sprintf("│ %s%s", searchPrefix, searchDisplay)
-	padding = m.width - len(searchLine) - 1
+	padding = m.width - runewidth.StringWidth(searchLine) - 1
 	if padding > 0 {
 		searchLine += strings.Repeat(" ", padding)
 	}
@@ -472,12 +493,12 @@ func (m Model) View() string {
 		plainName := app.Name
 
 		// Truncate name if it's too long
-		if len(plainName) > maxNameWidth {
+		if runewidth.StringWidth(plainName) > maxNameWidth {
 			plainName = m.truncateText(plainName, maxNameWidth)
 			displayName = plainName
 		}
 
-		if m.searchQuery != "" && len(plainName) == len(app.Name) {
+		if m.searchQuery != "" && plainName == app.Name {
 			// Only highlight if we didn't truncate
 			matches := m.fuzzySearcher.GetMatchPositions(m.searchQuery, app.Name)
 			if len(matches) > 0 {
@@ -495,7 +516,7 @@ func (m Model) View() string {
 
 		// Calculate padding without ANSI codes for proper alignment
 		plainLine := fmt.Sprintf("│%s%s%s", prefix, plainName, favoritePlain)
-		padding = m.width - len(plainLine) - 1
+		padding = m.width - runewidth.StringWidth(plainLine) - 1
 		if padding > 0 {
 			if isSelected {
 				line += "\033[7m" + strings.Repeat(" ", padding) + "\033[0m"
@@ -527,7 +548,7 @@ func (m Model) View() string {
 		errorLine := fmt.Sprintf("│ \033[1;31mError:\033[0m %s", errorMsg)
 		// Calculate padding without ANSI codes
 		plainErrorLine := fmt.Sprintf("│ Error: %s", errorMsg)
-		padding = m.width - len(plainErrorLine) - 1
+		padding = m.width - runewidth.StringWidth(plainErrorLine) - 1
 		if padding > 0 {
 			errorLine += strings.Repeat(" ", padding)
 		}
@@ -767,7 +788,7 @@ type launchErrorMsg struct {
 }
 
 // toggleFavorite creates a command to toggle favorite status
-func (m *Model) toggleFavorite(app *interfaces.Application) tea.Cmd {
+func (m *Model) toggleFavorite(app interfaces.Application) tea.Cmd {
 	return func() tea.Msg {
 		return toggleFavoriteMsg{app: app}
 	}
@@ -783,7 +804,7 @@ func (m *Model) refreshApplications() tea.Cmd {
 
 // toggleFavoriteMsg is sent when favorite status should be toggled
 type toggleFavoriteMsg struct {
-	app *interfaces.Application
+	app interfaces.Application
 }
 
 // refreshMsg is sent when applications should be refreshed
