@@ -13,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Update handles TUI events and updates
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// update handles application events; Update adds presentation-only animation.
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width

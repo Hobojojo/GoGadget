@@ -2,6 +2,9 @@ package tui
 
 import "tui-app-launcher/internal/interfaces"
 
+// animationFrameMsg advances only the currently scheduled presentation frame.
+type animationFrameMsg struct{ id uint64 }
+
 // initMsg is sent when the model is initialized
 type initMsg struct{}
 

@@ -90,6 +90,7 @@ func TestBlackColorStates(t *testing.T) {
 	if !m.showHelp {
 		t.Fatal("help key did not open the guide")
 	}
+	m = settleAnimations(t, m)
 	help := m.View()
 	assertBlack(help, false)
 	for _, heading := range []string{"Keyboard Shortcuts:", "Search:", "Favorites:", "Error Handling:"} {
@@ -101,6 +102,7 @@ func TestBlackColorStates(t *testing.T) {
 		}
 	}
 	m = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m = settleAnimations(t, m)
 	if m.showHelp || !strings.Contains(m.View(), "Search") {
 		t.Fatal("help key did not return to the main view")
 	}

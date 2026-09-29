@@ -10,15 +10,26 @@ import (
 
 // View renders the launcher in the same terminal grid used by Bubble Tea.
 func (m Model) View() string {
+	if m.animations.help.active {
+		return m.renderHelpTransition()
+	}
 	if m.showHelp {
 		return m.renderHelp()
 	}
+	return m.renderMain()
+}
+
+func (m Model) renderMain() string {
 	inner := m.width - 2
 	rows := m.visibleRows()
 	m.ensureSelectionVisible()
 
 	lines := make([]string, 0, rows)
-	end := min(len(m.filteredApps), m.scrollOffset+rows)
+	shift := m.entranceRows()
+	for i := 0; i < shift; i++ {
+		lines = append(lines, rowStyle.Copy().Width(inner-2).Render(""))
+	}
+	end := min(len(m.filteredApps), m.scrollOffset+rows-shift)
 	for i := m.scrollOffset; i < end; i++ {
 		lines = append(lines, m.renderApplication(i, inner-2))
 	}
@@ -26,14 +37,15 @@ func (m Model) View() string {
 		lines = append(lines, rowStyle.Copy().Width(inner-2).Render(""))
 	}
 
-	parts := []string{m.renderHeader(inner), dividerRule(inner), m.renderSearch(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...))}
+	parts := []string{m.renderHeader(inner), dividerRule(inner), m.renderSearch(inner), panelStyle.Copy().Width(inner - 2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...))}
 	if m.errorMessage != "" {
 		label := errorStyle.Render("Error:")
-		message := m.truncateText(m.errorMessage, inner-10)
-		parts = append(parts, searchTextStyle.Copy().Width(inner).Render(" "+label+" "+message))
+		offset := min(6, max(0, int(m.animations.error.value+0.5)))
+		message := m.truncateText(m.errorMessage, inner-10-offset)
+		parts = append(parts, searchTextStyle.Copy().Width(inner).Render(strings.Repeat(" ", offset+1)+label+" "+message))
 	}
 	parts = append(parts, m.renderFooter(inner, false))
-	return containerStyle.Copy().Width(m.width-2).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
+	return containerStyle.Copy().Width(m.width - 2).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 }
 
 func (m Model) title() string {
@@ -62,7 +74,7 @@ func (m Model) renderHeader(width int) string {
 	}
 	// Keep the title accent on the same black surface as the banner.
 	text := headerTextStyle.Copy().Background(backgroundColor).Render(m.truncateText(m.title(), width-5))
-	return headerStyle.Copy().Width(width-2).Render(headerAccentStyle.Render("▍") + " " + text)
+	return headerStyle.Copy().Width(width - 2).Render(headerAccentStyle.Render("▍") + " " + text)
 }
 
 func (m Model) renderSearch(width int) string {
@@ -79,7 +91,7 @@ func (m Model) renderSearch(width int) string {
 		}
 		query = "..." + string(runes[start:])
 	}
-	line := " " + prefix + searchTextStyle.Render(query) + cursorStyle.Render("█")
+	line := " " + prefix + searchTextStyle.Render(query) + m.searchCursor()
 	return line + searchTextStyle.Render(strings.Repeat(" ", max(0, width-lipgloss.Width(line))))
 }
 
@@ -107,10 +119,9 @@ func (m Model) renderApplication(index, width int) string {
 		}
 		favorite = " " + star.Render("★")
 	}
-	prefix := "  "
+	prefix := m.applicationIndicator(index, selected)
 	style := rowStyle
 	if selected {
-		prefix = selectedIndicatorStyle.Render("▎") + " "
 		style = selectedRowStyle
 	}
 	return style.Copy().Width(width).Render(prefix + name + favorite)
@@ -137,7 +148,7 @@ func (m Model) renderFooter(width int, help bool) string {
 	if m.height < 14 {
 		return footerTextStyle.Copy().Width(width).Render(" " + m.truncateText(footer, width-2))
 	}
-	return footerStyle.Copy().Width(width-2).Render(footerTextStyle.Render(m.truncateText(footer, width-4)))
+	return footerStyle.Copy().Width(width - 2).Render(footerTextStyle.Render(m.truncateText(footer, width-4)))
 }
 
 // renderHelp keeps the same chrome as the main view and colors section headings.
@@ -195,8 +206,8 @@ func (m Model) renderHelp() string {
 			lines = append(lines, m.renderHelpLine(line, contentWidth))
 		}
 	}
-	parts := []string{m.renderHelpHeader(inner), dividerRule(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)), m.renderFooter(inner, true)}
-	return containerStyle.Copy().Width(m.width-2).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
+	parts := []string{m.renderHelpHeader(inner), dividerRule(inner), panelStyle.Copy().Width(inner - 2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)), m.renderFooter(inner, true)}
+	return containerStyle.Copy().Width(m.width - 2).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 }
 
 func (m Model) renderHelpHeader(width int) string {
@@ -204,7 +215,7 @@ func (m Model) renderHelpHeader(width int) string {
 	if m.height < 14 {
 		return headerTextStyle.Copy().Background(backgroundColor).Width(width).Render(" " + label)
 	}
-	return headerStyle.Copy().Width(width-2).Render(headerAccentStyle.Render("▍") + " " + headerTextStyle.Copy().Background(backgroundColor).Render(label))
+	return headerStyle.Copy().Width(width - 2).Render(headerAccentStyle.Render("▍") + " " + headerTextStyle.Copy().Background(backgroundColor).Render(label))
 }
 
 func (m Model) renderHelpLine(text string, width int) string {

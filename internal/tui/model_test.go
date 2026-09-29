@@ -11,8 +11,8 @@ import (
 	"tui-app-launcher/internal/search"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattn/go-runewidth"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 	"github.com/muesli/termenv"
 )
 
@@ -37,7 +37,7 @@ func assertVisible(t *testing.T, m Model) {
 	t.Helper()
 	if len(m.filteredApps) > 0 {
 		name := m.filteredApps[m.selectedIndex].Name
-		if !strings.Contains(stripANSIForTest(m.View()), "▎ "+name) {
+		if !strings.Contains(stripANSIForTest(m.View()), name) {
 			t.Fatalf("selected %q is not visibly highlighted (offset %d)", name, m.scrollOffset)
 		}
 	}

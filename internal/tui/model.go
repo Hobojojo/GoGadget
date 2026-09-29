@@ -29,6 +29,7 @@ type Model struct {
 	errorRecovery *errors.ErrorRecovery
 	isRefreshing  bool
 	cancelScan    context.CancelFunc
+	animations    animationState
 }
 
 // NewModel creates a new TUI model
@@ -48,6 +49,7 @@ func NewModel(fuzzySearcher interfaces.FuzzySearcher, configManager interfaces.C
 		errorMessage:  "",
 		errorRecovery: errors.NewErrorRecovery(),
 		isRefreshing:  false,
+		animations:    newAnimations(),
 	}
 }
 
