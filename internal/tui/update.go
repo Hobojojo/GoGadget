@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 	"unicode"
-	"unicode/utf8"
 
 	"tui-app-launcher/internal/errors"
 	"tui-app-launcher/internal/interfaces"
@@ -176,6 +175,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if handled, cmd := m.handleShortcut(msg); handled {
+			return m, cmd
+		}
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			if m.cancelScan != nil {
@@ -214,27 +216,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "tab":
-			if len(m.filteredApps) > 0 && m.selectedIndex < len(m.filteredApps) {
-				selectedApp := m.filteredApps[m.selectedIndex]
-				return m, m.toggleFavorite(selectedApp)
-			}
-			return m, nil
-
-		case "backspace":
-			if len(m.searchQuery) > 0 {
-				_, size := utf8.DecodeLastRuneInString(m.searchQuery)
-				m.searchQuery = m.searchQuery[:len(m.searchQuery)-size]
-				m.updateFilteredApps()
-			}
-			return m, nil
-
-		case "ctrl+u":
-			// Clear search query
-			m.searchQuery = ""
-			m.updateFilteredApps()
-			return m, nil
-
 		case "ctrl+l":
 			// Clear error message
 			m.errorMessage = ""
@@ -250,10 +231,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		default:
-			if msg.Type == tea.KeyRunes {
+			if msg.Type == tea.KeyRunes && !msg.Alt {
 				for _, r := range msg.Runes {
 					if unicode.IsPrint(r) {
-						m.searchQuery += string(r)
+						runes := []rune(m.searchQuery)
+						cursor := min(m.searchCursorIndex, len(runes))
+						m.searchQuery = string(runes[:cursor]) + string(r) + string(runes[cursor:])
+						m.searchCursorIndex = cursor + 1
 						m.updateFilteredApps()
 					}
 				}

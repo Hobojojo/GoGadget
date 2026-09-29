@@ -1,6 +1,4 @@
-//go:build ignore
-
-// Standalone alternative entry point: go run main_simple.go.
+// Standalone alternative entry point: go run ./cmd/diagnostics/launcher.
 package main
 
 import (

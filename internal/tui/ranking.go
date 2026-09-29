@@ -23,11 +23,26 @@ func (m *Model) rankByHistory(results []interfaces.SearchResult) {
 		return
 	}
 	history, now := manager.LaunchHistory(), time.Now()
+	score := func(record interfaces.LaunchRecord) float64 {
+		switch m.settings.Ranking {
+		case "frequency":
+			return float64(record.Count)
+		case "recency":
+			if record.LastUsed.IsZero() {
+				return 0
+			}
+			return float64(record.LastUsed.Unix())
+		case "none":
+			return 0
+		default:
+			return frecency(record, now)
+		}
+	}
 	if results == nil {
 		// Never sort the scanner's backing slice in place.
 		m.filteredApps = append([]interfaces.Application(nil), m.filteredApps...)
 		sort.SliceStable(m.filteredApps, func(i, j int) bool {
-			return frecency(history[m.filteredApps[i].HistoryID()], now) > frecency(history[m.filteredApps[j].HistoryID()], now)
+			return score(history[m.filteredApps[i].HistoryID()]) > score(history[m.filteredApps[j].HistoryID()])
 		})
 		return
 	}
@@ -36,6 +51,6 @@ func (m *Model) rankByHistory(results []interfaces.SearchResult) {
 		if results[i].Score != results[j].Score {
 			return results[i].Score > results[j].Score
 		}
-		return frecency(history[results[i].Application.HistoryID()], now) > frecency(history[results[j].Application.HistoryID()], now)
+		return score(history[results[i].Application.HistoryID()]) > score(history[results[j].Application.HistoryID()])
 	})
 }

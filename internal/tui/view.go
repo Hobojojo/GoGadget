@@ -30,10 +30,31 @@ func (m Model) renderMain() string {
 	for i := 0; i < shift; i++ {
 		lines = append(lines, rowStyle.Copy().Width(listWidth).Render(""))
 	}
-	end := min(len(m.filteredApps), m.scrollOffset+rows-shift)
-	for i := m.scrollOffset; i < end; i++ {
-		lines = append(lines, m.renderApplication(i, listWidth))
+	columns := m.columns()
+	cellWidth := (listWidth - (columns - 1)) / columns
+	end := min(len(m.filteredApps), m.scrollOffset+(rows-shift)*columns)
+	for i := m.scrollOffset; i < end; i += columns {
+		line := m.renderApplication(i, cellWidth)
+		if columns == 2 {
+			line += rowStyle.Render(" ")
+			if i+1 < end {
+				line += m.renderApplication(i+1, listWidth-cellWidth-1)
+			} else {
+				line += rowStyle.Copy().Width(listWidth - cellWidth - 1).Render("")
+			}
+		}
+		lines = append(lines, line)
 	}
+	if len(m.filteredApps) == 0 && len(lines) < rows {
+		message := "No applications found. Ctrl+R to rescan."
+		if m.isRefreshing {
+			message = "Scanning for applications..."
+		} else if m.searchQuery != "" || m.category != "" {
+			message = "No matches. Clear search or change category."
+		}
+		lines = append(lines, rowStyle.Copy().Width(listWidth).Render(m.truncateText(message, listWidth)))
+	}
+
 	for len(lines) < rows {
 		lines = append(lines, rowStyle.Copy().Width(listWidth).Render(""))
 	}
@@ -66,6 +87,12 @@ func (m Model) title() string {
 			title += " (favorites)"
 		}
 	}
+	if m.category != "" {
+		title += " [" + m.category + "]"
+	}
+	if m.caseSensitive {
+		title += " [Aa]"
+	}
 	return title
 }
 
@@ -81,27 +108,25 @@ func (m Model) renderHeader(width int) string {
 func (m Model) renderSearch(width int) string {
 	prefix := searchStyle.Render("  Search  ")
 	available := max(0, width-lipgloss.Width(prefix)-3)
-	query := m.searchQuery
-	if runewidth.StringWidth(query) > available {
-		// Retain the newest search input; do not split a UTF-8 rune.
-		runes := []rune(query)
-		start, used := len(runes), 0
-		for start > 0 && used+runewidth.RuneWidth(runes[start-1]) <= max(0, available-3) {
-			start--
-			used += runewidth.RuneWidth(runes[start])
-		}
-		query = "..." + string(runes[start:])
+	runes := []rune(m.searchQuery)
+	cursor := min(max(0, m.searchCursorIndex), len(runes))
+	start := 0
+	for start < cursor && runewidth.StringWidth(string(runes[start:cursor])) > available {
+		start++
 	}
-	line := " " + prefix + searchTextStyle.Render(query) + m.searchCursor()
+	before := string(runes[start:cursor])
+	after := m.truncateText(string(runes[cursor:]), max(0, available-runewidth.StringWidth(before)))
+	line := " " + prefix + searchTextStyle.Render(before) + m.searchCursor() + searchTextStyle.Render(after)
 	return line + searchTextStyle.Render(strings.Repeat(" ", max(0, width-lipgloss.Width(line))))
 }
 
 func (m Model) renderApplication(index, width int) string {
 	app := m.filteredApps[index]
 	selected := index == m.selectedIndex
-	name := m.truncateText(app.Name, max(0, width-6))
+	name := m.truncateText(app.Name, max(0, width-8))
 	if m.searchQuery != "" {
-		matches := m.fuzzySearcher.GetMatchPositions(m.searchQuery, app.Name)
+		query, _ := m.searchScope()
+		matches := m.fuzzySearcher.GetMatchPositions(query, app.Name)
 		highlight := matchStyle
 		if selected {
 			highlight = selectedMatchStyle
@@ -121,6 +146,11 @@ func (m Model) renderApplication(index, width int) string {
 		favorite = " " + star.Render("★")
 	}
 	prefix := m.applicationIndicator(index, selected)
+	if number := index - m.scrollOffset + 1; number <= 9 {
+		prefix += fmt.Sprintf("%d ", number)
+	} else {
+		prefix += "  "
+	}
 	style := rowStyle
 	if selected {
 		style = selectedRowStyle
@@ -129,19 +159,19 @@ func (m Model) renderApplication(index, width int) string {
 }
 
 func (m Model) renderFooter(width int, help bool) string {
-	footer := "↑/↓ Navigate  Enter Launch  Tab Favorite  Ctrl+R Refresh  ? Help  Esc Exit"
+	footer := "↑/↓ Navigate  Enter Launch  Ctrl+D Favorite  Ctrl+R Refresh  ? Help  Esc Exit"
 	if help {
 		footer = "Press ? to return to main view"
 	} else if m.errorMessage != "" {
 		footer = "Ctrl+L Clear  Ctrl+R Refresh  ? Help  Esc Exit"
 	} else if width < 79 {
-		footer = "↑/↓ Navigate  Enter Launch  Tab Fav  ? Help  Esc Exit"
+		footer = "↑/↓ Navigate  Enter Launch  ^D Fav  ? Help  Esc Exit"
 	}
 	if width < 60 && !help && m.errorMessage == "" {
-		footer = "↑/↓ Nav  Enter Launch  Tab Fav  ? Help  Esc Exit"
+		footer = "↑/↓ Nav  Enter Launch  ^D Fav  ? Help  Esc Exit"
 	}
 	if width < 50 && !help && m.errorMessage == "" {
-		footer = "↑/↓  Enter  Tab  ? Help  Esc Exit"
+		footer = "↑/↓  Enter  ^D  ? Help  Esc Exit"
 	}
 	if width < 40 && !help {
 		footer = "? Help  Esc Exit"
@@ -156,55 +186,52 @@ func (m Model) renderFooter(width int, help bool) string {
 func (m Model) renderHelp() string {
 	inner := m.width - 2
 	contentWidth := inner - 2
-	helpLines := []string{
-		"", "Keyboard Shortcuts:",
-		"  ↑/↓           Navigate up/down through applications",
-		"  Enter         Launch selected application",
-		"  Tab           Toggle favorite status",
-		"  Backspace     Delete character from search",
-		"  Ctrl+U        Clear search query",
-		"  Ctrl+L        Clear error message",
-		"  Ctrl+R        Refresh application list",
-		"  ?             Toggle this help screen",
-		"  Esc/Ctrl+C    Exit application",
-		"", "Search:",
-		"  Type any characters to search for applications",
-		"  Words match names, commands and metadata in any order",
-		"  Clear search to see favorites list",
-		"", "Favorites:",
-		"  Use Tab to add/remove applications from favorites",
-		"  Favorites appear first in search results",
-		"  When no search query, only favorites are shown",
-		"", "Error Handling:",
-		"  If an application fails to launch, an error message will appear",
-		"  Use Ctrl+L to clear error messages",
-		"", "Press ? again to return to the main view.",
+	left := []string{
+		"Keyboard Shortcuts:",
+		"↑/↓ Navigate   Home/End First/Last",
+		"PgUp/PgDn Move one page",
+		"Enter Launch   Alt+1–9 Visible app",
+		"Alt+Enter Force terminal launch",
+		"Ctrl+D / Ctrl+Space Favorite",
+		"Tab / Shift+Tab Cycle category",
+		"←/→ Edit cursor   Ctrl+A/E Start/End",
+		"Ctrl+W Delete word   Ctrl+U Clear",
+		"Ctrl+\\ Toggle case sensitivity",
+		"Ctrl+R Rescan   Ctrl+L Clear error",
+		"? Help   Esc/Ctrl+C Exit",
+	}
+	right := []string{
+		"Search:", "Words match name/Exec/metadata",
+		"/Development query filters category",
+		"Clear search to show favorites",
+		"Favorites:", "Ctrl+D adds/removes favorites",
+		"Favorites appear first in results",
+		"Wide terminals show two columns",
+		"Settings:", "Edit ~/.config/tui-launcher/config.json",
+		"search_fields, ranking, multi_column",
+		"case_sensitive (loaded on startup)",
+		"Error Handling:", "Ctrl+L clears errors; Ctrl+R rescans",
 	}
 	rows := m.visibleRows()
 	lines := make([]string, 0, rows)
-	if contentWidth >= 76 {
-		// Two columns show all shortcut and help sections at standard heights.
-		left := helpLines[1:11]
-		right := append(append(append([]string{}, helpLines[12:16]...), helpLines[17:21]...), helpLines[22:25]...)
-		right = append(right, helpLines[26])
-		leftWidth := contentWidth / 2
-		for i := 0; i < rows; i++ {
-			var first, second string
+	for i := 0; i < rows; i++ {
+		if contentWidth >= 76 {
+			first, second := "", ""
 			if i < len(left) {
 				first = left[i]
 			}
 			if i < len(right) {
 				second = right[i]
 			}
+			leftWidth := contentWidth / 2
 			lines = append(lines, m.renderHelpLine(first, leftWidth)+m.renderHelpLine(second, contentWidth-leftWidth))
-		}
-	} else {
-		for i := 0; i < rows; i++ {
-			line := ""
-			if i < len(helpLines) {
-				line = helpLines[i]
+		} else {
+			all := append(append([]string{}, left...), right...)
+			text := ""
+			if i < len(all) {
+				text = all[i]
 			}
-			lines = append(lines, m.renderHelpLine(line, contentWidth))
+			lines = append(lines, m.renderHelpLine(text, contentWidth))
 		}
 	}
 	parts := []string{m.renderHelpHeader(inner), dividerRule(inner), panelStyle.Copy().Width(inner - 2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)), m.renderFooter(inner, true)}
@@ -222,7 +249,7 @@ func (m Model) renderHelpHeader(width int) string {
 func (m Model) renderHelpLine(text string, width int) string {
 	text = m.truncateText(text, width-2)
 	switch text {
-	case "Keyboard Shortcuts:", "Search:", "Favorites:", "Error Handling:":
+	case "Keyboard Shortcuts:", "Search:", "Favorites:", "Error Handling:", "Settings:":
 		text = helpHeadingStyle.Render(text)
 	}
 	return rowStyle.Copy().Width(width).Render(" " + text)

@@ -1,6 +1,4 @@
-//go:build ignore
-
-// Standalone logging diagnostic: go run test_log_creation.go.
+// Standalone logging diagnostic: go run ./cmd/diagnostics/logging.
 package main
 
 import (
@@ -46,10 +44,10 @@ func main() {
 	// Check if log file was created
 	homeDir, _ := os.UserHomeDir()
 	logPath := filepath.Join(homeDir, ".config", "tui-launcher", "launcher.log")
-	
+
 	if _, err := os.Stat(logPath); err == nil {
 		fmt.Printf("✓ Log file created successfully at: %s\n", logPath)
-		
+
 		// Read and display log contents
 		content, err := os.ReadFile(logPath)
 		if err == nil {

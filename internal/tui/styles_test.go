@@ -69,7 +69,7 @@ func TestBlackColorStates(t *testing.T) {
 	}
 	selected := m.renderApplication(0, 40)
 	assertBlack(selected, true)
-	if !strings.Contains(selected, "255;255;255") || !strings.Contains(selected, "121;162;247") || !strings.Contains(stripANSIForTest(selected), "▎ App") {
+	if !strings.Contains(selected, "255;255;255") || !strings.Contains(selected, "121;162;247") || !strings.Contains(stripANSIForTest(selected), "▎ 1 App") {
 		t.Fatal("selection lost its bright text or blue indicator")
 	}
 	for _, color := range regexp.MustCompile(`48;2;(\d+;\d+;\d+)`).FindAllStringSubmatch(selected, -1) {

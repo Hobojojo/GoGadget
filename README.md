@@ -57,7 +57,16 @@ tui-launcher
 |-----|--------|
 | `↑/↓` | Navigate up/down through applications |
 | `Enter` | Launch selected application |
-| `Tab` | Toggle favorite status of selected application |
+| `Alt+1`–`Alt+9` | Launch numbered application in the visible window |
+| `Alt+Enter` | Force launch in a terminal emulator |
+| `Ctrl+D` or `Ctrl+Space` | Toggle favorite status of selected application |
+| `Tab` / `Shift+Tab` | Cycle category forward/backward (including all categories) |
+| `Home` / `End` | Select first/last result |
+| `Page Up` / `Page Down` | Navigate by a visible page |
+| `Left` / `Right`, `Ctrl+A` / `Ctrl+E` | Move search cursor; jump to start/end |
+| `Ctrl+W` | Delete word before search cursor |
+| `Delete` | Delete character after search cursor |
+| `Ctrl+\` | Toggle case-sensitive search |
 | `Backspace` | Delete character from search query |
 | `Ctrl+U` | Clear search query |
 | `Ctrl+L` | Clear error messages |
@@ -68,13 +77,17 @@ tui-launcher
 ### Search
 
 - Type any characters to search for applications using fuzzy matching
-- Search matches application names, comments, and categories
+- Space-separated tokens must all match, across enabled names, executable commands, comments, generic names, keywords, and categories
+- Use `/Development query` to filter by a desktop category and search within it
+- Terminals wider than 100 columns show two row-major list columns beside the details pane; narrower terminals retain one column
+- Empty and scanning states explain what is happening; `Ctrl+R` rescans
+- `Alt+Enter` is the portable force-terminal shortcut: traditional terminals cannot distinguish `Shift+Enter` from `Enter`. `Ctrl+Tab` is also commonly indistinguishable from Tab, so plain Tab cycles categories.
 - Clear the search query to view your favorites list
 - Favorites appear first in search results
 
 ### Favorites Management
 
-- Use `Tab` to add or remove applications from favorites
+- Use `Ctrl+D` or `Ctrl+Space` to add or remove applications from favorites
 - Favorites are displayed by default when no search query is entered
 - Favorites are persisted across application restarts
 - Favorite applications are marked with a ★ symbol
@@ -94,9 +107,17 @@ The application stores its configuration in `~/.config/tui-launcher/`:
     "Firefox Web Browser",
     "Visual Studio Code",
     "Terminal"
-  ]
+  ],
+  "settings": {
+    "search_fields": ["name", "exec", "comment", "generic_name", "categories", "keywords"],
+    "ranking": "frecency",
+    "multi_column": true,
+    "case_sensitive": false
+  }
 }
 ```
+
+Settings are optional and loaded on startup; old favorites-only files still work. `ranking` accepts `frecency` (default), `frequency`, `recency`, or `none`. Omitted/empty `search_fields` searches all supported fields. Launch history is stored automatically under `launch_history` after successful starts. Case-sensitivity toggles are session-only unless set in the file.
 
 ## Application Discovery
 

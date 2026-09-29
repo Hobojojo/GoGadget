@@ -16,6 +16,7 @@ import (
 // Config represents the application configuration structure
 type Config struct {
 	Favorites     []string                           `json:"favorites"`
+	Settings      interfaces.Settings                `json:"settings,omitempty"`
 	LaunchHistory map[string]interfaces.LaunchRecord `json:"launch_history,omitempty"`
 }
 

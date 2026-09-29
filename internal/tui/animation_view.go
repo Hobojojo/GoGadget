@@ -14,17 +14,20 @@ func unit(value float64) float64 {
 }
 
 func (m Model) entranceRows() int {
-	return min(max(0, m.visibleRows()-1-(m.selectedIndex-m.scrollOffset)), max(0, int(math.Round(m.animations.list.value))))
+	return min(max(0, m.visibleRows()-1-(m.selectedIndex-m.scrollOffset)/m.columns()), max(0, int(math.Round(m.animations.list.value))))
 }
 
 // Terminal rows cannot move by fractions of a cell. Crossfading adjacent markers
 // makes the spring's fractional position visible while selection stays immediate.
 func (m Model) applicationIndicator(index int, selected bool) string {
-	position := float64(m.selectedIndex - m.scrollOffset)
+	position := float64((m.selectedIndex - m.scrollOffset) / m.columns())
 	if m.animations.cursor.active {
 		position = m.animations.cursor.value
 	}
-	strength := unit(1 - math.Abs(float64(index-m.scrollOffset)-position))
+	if (index-m.scrollOffset)%m.columns() != (m.selectedIndex-m.scrollOffset)%m.columns() {
+		return "  "
+	}
+	strength := unit(1 - math.Abs(float64((index-m.scrollOffset)/m.columns())-position))
 	if strength <= 0 {
 		return "  "
 	}

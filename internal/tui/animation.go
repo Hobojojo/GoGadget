@@ -134,14 +134,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) reconcileAnimations(previous Model, msg tea.Msg) {
 	// Error appearance changes list height; clamp before choosing visual targets.
 	m.ensureSelectionVisible()
-	target := float64(m.selectedIndex - m.scrollOffset)
+	target := float64((m.selectedIndex - m.scrollOffset) / m.columns())
 	key, keyEvent := msg.(tea.KeyMsg)
 	navigating := keyEvent && (key.String() == "up" || key.String() == "down")
 	_, resizing := msg.(tea.WindowSizeMsg)
 
 	if navigating {
 		m.animations.list.snap(0) // Navigation never waits for an entrance animation.
-		shift := float64(previous.scrollOffset - m.scrollOffset)
+		shift := float64(previous.scrollOffset-m.scrollOffset) / float64(m.columns())
 		m.animations.cursor.value = math.Max(0, math.Min(float64(max(0, m.visibleRows()-1)), m.animations.cursor.value+shift))
 		if math.Abs(float64(previous.selectedIndex-m.selectedIndex)) > 1 {
 			m.animations.cursor.snap(target) // Wraparound should not sweep the entire list.

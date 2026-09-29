@@ -24,11 +24,11 @@ func (m *Model) ensureSelectionVisible() {
 		return
 	}
 	m.selectedIndex = max(0, min(m.selectedIndex, len(m.filteredApps)-1))
-	rows := max(1, m.visibleRows())
+	rows := m.visibleCapacity()
 	if m.selectedIndex < m.scrollOffset {
-		m.scrollOffset = m.selectedIndex
+		m.scrollOffset = (m.selectedIndex / m.columns()) * m.columns()
 	} else if m.selectedIndex >= m.scrollOffset+rows {
-		m.scrollOffset = m.selectedIndex - rows + 1
+		m.scrollOffset = (m.selectedIndex/m.columns() - max(1, m.visibleRows()) + 1) * m.columns()
 	}
-	m.scrollOffset = max(0, min(m.scrollOffset, len(m.filteredApps)-rows))
+	m.scrollOffset = max(0, min(m.scrollOffset, ((len(m.filteredApps)+m.columns()-1)/m.columns()-max(1, m.visibleRows()))*m.columns()))
 }

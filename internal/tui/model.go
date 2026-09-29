@@ -13,28 +13,32 @@ import (
 
 // Model represents the TUI application state
 type Model struct {
-	applications  []interfaces.Application
-	filteredApps  []interfaces.Application
-	searchQuery   string
-	selectedIndex int
-	scrollOffset  int
-	fuzzySearcher interfaces.FuzzySearcher
-	configManager interfaces.ConfigManager
-	launcher      interfaces.ApplicationLauncher
-	scanner       interfaces.ApplicationScanner
-	showHelp      bool
-	width         int
-	height        int
-	errorMessage  string
-	errorRecovery *errors.ErrorRecovery
-	isRefreshing  bool
-	cancelScan    context.CancelFunc
-	animations    animationState
+	applications      []interfaces.Application
+	filteredApps      []interfaces.Application
+	searchQuery       string
+	searchCursorIndex int
+	category          string
+	caseSensitive     bool
+	settings          interfaces.Settings
+	selectedIndex     int
+	scrollOffset      int
+	fuzzySearcher     interfaces.FuzzySearcher
+	configManager     interfaces.ConfigManager
+	launcher          interfaces.ApplicationLauncher
+	scanner           interfaces.ApplicationScanner
+	showHelp          bool
+	width             int
+	height            int
+	errorMessage      string
+	errorRecovery     *errors.ErrorRecovery
+	isRefreshing      bool
+	cancelScan        context.CancelFunc
+	animations        animationState
 }
 
 // NewModel creates a new TUI model
 func NewModel(fuzzySearcher interfaces.FuzzySearcher, configManager interfaces.ConfigManager, launcher interfaces.ApplicationLauncher, scanner interfaces.ApplicationScanner) Model {
-	return Model{
+	m := Model{
 		applications:  make([]interfaces.Application, 0),
 		filteredApps:  make([]interfaces.Application, 0),
 		searchQuery:   "",
@@ -51,6 +55,12 @@ func NewModel(fuzzySearcher interfaces.FuzzySearcher, configManager interfaces.C
 		isRefreshing:  false,
 		animations:    newAnimations(),
 	}
+	if manager, ok := configManager.(interfaces.SettingsManager); ok {
+		m.settings = manager.Settings()
+	}
+	m.caseSensitive = m.settings.CaseSensitive
+	m.configureSearch()
+	return m
 }
 
 // getMinWidth returns the minimum width required for the interface
@@ -158,21 +168,28 @@ func (m Model) Init() tea.Cmd {
 
 // updateFilteredApps updates the filtered applications list
 func (m *Model) updateFilteredApps() {
-	if m.searchQuery == "" {
+	query, category := m.searchScope()
+	items := make([]interfaces.Application, 0, len(m.applications))
+	for _, app := range m.applications {
+		if inCategory(app, category) {
+			items = append(items, app)
+		}
+	}
+	if query == "" {
 		// Show favorites when no search query
 		m.filteredApps = make([]interfaces.Application, 0)
-		for _, app := range m.applications {
+		for _, app := range items {
 			if app.IsFavorite {
 				m.filteredApps = append(m.filteredApps, app)
 			}
 		}
 		// If no favorites, show all applications
 		if len(m.filteredApps) == 0 {
-			m.filteredApps = m.applications
+			m.filteredApps = items
 		}
 	} else {
 		// Use fuzzy search; history breaks equal-relevance ties.
-		results := m.fuzzySearcher.Search(m.searchQuery, m.applications)
+		results := m.fuzzySearcher.Search(query, items)
 		m.rankByHistory(results)
 
 		// Separate favorites and non-favorites in search results
@@ -193,7 +210,7 @@ func (m *Model) updateFilteredApps() {
 		m.filteredApps = append(m.filteredApps, regularResults...)
 	}
 
-	if m.searchQuery == "" {
+	if query == "" {
 		m.rankByHistory(nil)
 	}
 

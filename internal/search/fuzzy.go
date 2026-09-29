@@ -10,7 +10,10 @@ import (
 
 // FuzzySearcher implements fuzzy search functionality
 type FuzzySearcher struct {
-	items []interfaces.Application
+	items         []interfaces.Application
+	lower         map[string]string
+	fields        []string
+	caseSensitive bool
 }
 
 // NewFuzzySearcher creates a new fuzzy searcher instance
@@ -36,15 +39,32 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 	}
 
 	results := make([]interfaces.SearchResult, 0)
-	tokens := strings.Fields(strings.ToLower(query))
+	tokens := strings.Fields(f.normalize(query))
 	for _, item := range items {
-		name := strings.ToLower(item.Name)
-		metadata := append([]string{item.Exec, item.Comment, item.GenericName}, item.Categories...)
-		metadata = append(metadata, item.Keywords...)
+		name := f.normalize(item.Name)
+		metadata := make([]string, 0, 3+len(item.Categories)+len(item.Keywords))
+		if f.fieldEnabled("exec") {
+			metadata = append(metadata, item.Exec)
+		}
+		if f.fieldEnabled("comment") {
+			metadata = append(metadata, item.Comment)
+		}
+		if f.fieldEnabled("generic_name") {
+			metadata = append(metadata, item.GenericName)
+		}
+		if f.fieldEnabled("categories") {
+			metadata = append(metadata, item.Categories...)
+		}
+		if f.fieldEnabled("keywords") {
+			metadata = append(metadata, item.Keywords...)
+		}
 		total, complete := 0, true
 		var positions []int
 		for _, token := range tokens {
-			score, matches := f.calculateScore(token, name)
+			score, matches := 0, []int(nil)
+			if f.fieldEnabled("name") {
+				score, matches = f.calculateScore(token, name)
+			}
 			if len(matches) > 0 {
 				total += score
 				positions = append(positions, matches...)
@@ -52,7 +72,7 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 			}
 			found := false
 			for _, text := range metadata {
-				candidate, hits := f.calculateScore(token, strings.ToLower(text))
+				candidate, hits := f.calculateScore(token, f.normalize(text))
 				if len(hits) > 0 && (!found || candidate > score) {
 					score, found = candidate, true
 				}
@@ -82,6 +102,14 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 // SetItems updates the searchable items
 func (f *FuzzySearcher) SetItems(items []interfaces.Application) {
 	f.items = items
+	f.lower = make(map[string]string, len(items)*4)
+	for _, item := range items {
+		texts := append([]string{item.Name, item.Exec, item.Comment, item.GenericName}, item.Categories...)
+		texts = append(texts, item.Keywords...)
+		for _, text := range texts {
+			f.lower[text] = strings.ToLower(text)
+		}
+	}
 }
 
 // calculateScore computes the fuzzy match score and character positions
@@ -94,51 +122,43 @@ func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
 	}
 
 	queryRunes := []rune(query)
-	targetRunes := []rune(target)
-
-	// Track matched positions
+	// A cheap subsequence pass rejects impossible matches without allocating
+	// positions. Unlike a substring filter, it preserves scattered fuzzy matches.
+	matched := 0
+	targetLength := 0
+	for _, r := range target {
+		targetLength++
+		if matched < len(queryRunes) && r == queryRunes[matched] {
+			matched++
+		}
+	}
+	if matched != len(queryRunes) {
+		return 0, nil
+	}
 	matches := make([]int, 0, len(queryRunes))
-	score := 0
-	queryIdx := 0
-
-	for targetIdx, targetChar := range targetRunes {
+	score, queryIdx := 0, 0
+	previous := rune(0)
+	targetIdx := 0
+	for _, targetChar := range target {
 		if queryIdx >= len(queryRunes) {
 			break
 		}
-
 		if queryRunes[queryIdx] == targetChar {
-			matches = append(matches, targetIdx)
-
-			// Base score for character match
-			charScore := 1
-
-			// Position weighting bonuses
+			charScore := 2
 			if targetIdx == 0 {
-				// Bonus for matching at start of string
 				charScore += 3
-			} else if targetIdx > 0 && isWordBoundary(targetRunes[targetIdx-1]) {
-				// Bonus for matching at word boundary
+			} else if isWordBoundary(previous) {
 				charScore += 2
 			}
-
-			// Consecutive character bonus
-			if queryIdx > 0 && len(matches) > 1 {
-				prevMatchIdx := matches[len(matches)-2]
-				if targetIdx == prevMatchIdx+1 {
-					charScore += 1
-				}
+			if len(matches) > 0 && targetIdx == matches[len(matches)-1]+1 {
+				charScore++
 			}
-
-			// Case match bonus (if original characters match case)
-			if len(query) > queryIdx && len(target) > targetIdx {
-				if rune(query[queryIdx]) == rune(target[targetIdx]) {
-					charScore += 1
-				}
-			}
-
+			matches = append(matches, targetIdx)
 			score += charScore
 			queryIdx++
 		}
+		previous = targetChar
+		targetIdx++
 	}
 
 	// Only return results if all query characters were matched
@@ -147,7 +167,7 @@ func (f *FuzzySearcher) calculateScore(query, target string) (int, []int) {
 	}
 
 	// Apply length penalty for longer strings to prefer shorter matches
-	lengthPenalty := len(targetRunes) - len(queryRunes)
+	lengthPenalty := targetLength - len(queryRunes)
 	if lengthPenalty > 0 {
 		score -= lengthPenalty / 4 // Mild penalty
 	}
@@ -198,13 +218,13 @@ func (f *FuzzySearcher) HighlightMatches(text string, matches []int) string {
 // GetMatchPositions returns the character positions that matched for a given search
 // This is a convenience method that re-runs the scoring to get match positions
 func (f *FuzzySearcher) GetMatchPositions(query, target string) []int {
-	if query == "" || target == "" {
+	if query == "" || target == "" || !f.fieldEnabled("name") {
 		return []int{}
 	}
 
 	var positions []int
-	for _, token := range strings.Fields(strings.ToLower(query)) {
-		_, matches := f.calculateScore(token, strings.ToLower(target))
+	for _, token := range strings.Fields(f.normalize(query)) {
+		_, matches := f.calculateScore(token, f.normalize(target))
 		positions = append(positions, matches...)
 	}
 	return uniquePositions(positions)

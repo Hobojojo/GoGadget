@@ -13,6 +13,9 @@ func (m Model) listWidth(inner int) int {
 	if m.width <= 80 {
 		return inner - 2
 	}
+	if m.columns() == 2 {
+		return (inner - 5) * 2 / 3
+	}
 	return (inner - 5) / 2
 }
 

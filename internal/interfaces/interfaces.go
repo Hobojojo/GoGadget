@@ -72,6 +72,22 @@ type LaunchHistoryManager interface {
 	RecordLaunch(Application) error
 }
 
+// Settings keeps preferences optional for legacy configuration and test doubles.
+type Settings struct {
+	SearchFields  []string `json:"search_fields,omitempty"`
+	Ranking       string   `json:"ranking,omitempty"`
+	MultiColumn   *bool    `json:"multi_column,omitempty"`
+	CaseSensitive bool     `json:"case_sensitive,omitempty"`
+}
+
+type SettingsManager interface {
+	Settings() Settings
+}
+
+type SearchConfigurer interface {
+	ConfigureSearch(fields []string, caseSensitive bool)
+}
+
 // ApplicationLauncher interface for launching applications
 type ApplicationLauncher interface {
 	LaunchApplication(app Application) error

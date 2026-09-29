@@ -177,7 +177,7 @@ func stripANSIForTest(text string) string {
 
 func TestFavoriteMessageCopiesSelection(t *testing.T) {
 	m := testModel(t, 1)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
 	m.filteredApps[0].Name = "Changed"
 	msg := cmd().(toggleFavoriteMsg)
 	if msg.app.Name != "Application 00" {
