@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/mattn/go-runewidth"
+	"github.com/muesli/termenv"
 )
 
 func TestNordViewsFitTerminal(t *testing.T) {
@@ -50,9 +50,13 @@ func TestNordColorStates(t *testing.T) {
 			t.Fatalf("missing Nord color %s in main view: %q", color, main)
 		}
 	}
+	selected := m.renderApplication(0, 40)
+	if !strings.Contains(selected, "38;2;46;52;64") || strings.Contains(selected, "38;2;163;190;140") || strings.Contains(selected, "38;2;235;203;139") {
+		t.Fatal("selected row accents must remain legible on the blue background")
+	}
 	m.errorMessage = "Example error"
-	if view := m.View(); !strings.Contains(view, "Example error") || !strings.Contains(view, "191;97;105") {
-		t.Fatal("error label or message lost Nord styling")
+	if view := m.View(); !strings.Contains(view, "Example error") || !strings.Contains(view, "229;163;169") {
+		t.Fatalf("error label or message lost readable red styling: %q", view)
 	}
 	m = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	if !m.showHelp {

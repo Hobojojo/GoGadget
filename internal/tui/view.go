@@ -90,15 +90,23 @@ func (m Model) renderApplication(index, width int) string {
 	name := m.truncateText(app.Name, max(0, width-6))
 	if m.searchQuery != "" {
 		matches := m.fuzzySearcher.GetMatchPositions(m.searchQuery, app.Name)
+		highlight := matchStyle
+		if selected {
+			highlight = selectedMatchStyle
+		}
 		if strings.HasSuffix(name, "...") && name != app.Name {
-			name = m.highlightMatches(strings.TrimSuffix(name, "..."), matches) + "..."
+			name = m.highlightMatches(strings.TrimSuffix(name, "..."), matches, highlight) + "..."
 		} else {
-			name = m.highlightMatches(name, matches)
+			name = m.highlightMatches(name, matches, highlight)
 		}
 	}
 	favorite := ""
 	if app.IsFavorite {
-		favorite = " " + favoriteStyle.Render("★")
+		star := favoriteStyle
+		if selected {
+			star = selectedFavoriteStyle
+		}
+		favorite = " " + star.Render("★")
 	}
 	prefix := "  "
 	style := rowStyle
@@ -216,7 +224,7 @@ func (m Model) renderHelpLine(text string, width int) string {
 }
 
 // highlightMatches colors only visible rune positions; ellipses are never highlighted.
-func (m *Model) highlightMatches(text string, matches []int) string {
+func (m *Model) highlightMatches(text string, matches []int, style lipgloss.Style) string {
 	if len(matches) == 0 {
 		return text
 	}
@@ -227,7 +235,7 @@ func (m *Model) highlightMatches(text string, matches []int) string {
 	var result strings.Builder
 	for i, r := range []rune(text) {
 		if positions[i] {
-			result.WriteString(matchStyle.Render(string(r)))
+			result.WriteString(style.Render(string(r)))
 		} else {
 			result.WriteRune(r)
 		}

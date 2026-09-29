@@ -148,8 +148,8 @@ func TestTruncatedNameHighlightsVisibleMatches(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(profile)
 	view := m.View()
-	if !strings.Contains(view, "235;203;139") || !strings.Contains(view, "...") {
-		t.Fatalf("truncated result lost Nord match highlight: %q", view)
+	if !strings.Contains(view, "4;38;2;46;52;64") || !strings.Contains(view, "...") {
+		t.Fatalf("truncated selected result lost its legible match underline: %q", view)
 	}
 	for _, line := range strings.Split(view, "\n") {
 		if runewidth.StringWidth(stripANSIForTest(line)) != m.width {

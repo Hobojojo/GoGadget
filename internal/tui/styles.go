@@ -23,29 +23,32 @@ const (
 	auroraYellow lipgloss.Color = "#EBCB8B"
 	auroraGreen  lipgloss.Color = "#A3BE8C"
 	auroraPurple lipgloss.Color = "#B48EAD"
-	panelColor   lipgloss.Color = "#242933"
+	// A lighter red keeps error text readable on Nord's dark surfaces.
+	readableRed lipgloss.Color = "#E5A4A9"
 )
 
 var (
-	containerStyle    = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(frostBlue).Background(nord0).Foreground(nord5)
-	headerStyle       = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(frostBlue).Background(nord1).Foreground(nord5).Bold(true).Padding(0, 1)
-	headerTextStyle   = lipgloss.NewStyle().Foreground(nord5).Bold(true)
-	headerAccentStyle = lipgloss.NewStyle().Foreground(frostDeep).Background(nord1)
-	searchStyle       = lipgloss.NewStyle().Foreground(frostCyan).Background(nord0).Bold(true)
-	searchTextStyle   = lipgloss.NewStyle().Foreground(nord5).Background(nord0)
-	cursorStyle       = lipgloss.NewStyle().Foreground(auroraYellow).Background(nord0).Bold(true)
-	panelStyle        = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(nord3).Background(panelColor).Foreground(nord5)
-	rowStyle          = lipgloss.NewStyle().Background(panelColor).Foreground(nord5)
-	selectedRowStyle  = lipgloss.NewStyle().Background(frostBlue).Foreground(nord0).Bold(true)
-	favoriteStyle     = lipgloss.NewStyle().Foreground(auroraGreen).Bold(true)
-	matchStyle        = lipgloss.NewStyle().Foreground(auroraYellow).Bold(true)
-	errorStyle        = lipgloss.NewStyle().Foreground(auroraRed).Background(nord0).Bold(true)
-	footerStyle       = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(auroraGreen).Background(nord1).Foreground(nord5).Padding(0, 1)
-	footerTextStyle   = lipgloss.NewStyle().Foreground(nord5).Background(nord1)
-	helpShortcutStyle = lipgloss.NewStyle().Foreground(frostBlue).Bold(true)
-	helpSearchStyle   = lipgloss.NewStyle().Foreground(auroraGreen).Bold(true)
-	helpFavoriteStyle = lipgloss.NewStyle().Foreground(auroraYellow).Bold(true)
-	helpErrorStyle    = lipgloss.NewStyle().Foreground(auroraRed).Bold(true)
+	containerStyle        = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(frostBlue).Background(nord1).Foreground(nord5)
+	headerStyle           = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(frostBlue).Background(nord1).Foreground(nord5).Bold(true).Padding(0, 1)
+	headerTextStyle       = lipgloss.NewStyle().Foreground(nord5).Bold(true)
+	headerAccentStyle     = lipgloss.NewStyle().Foreground(nord4).Background(nord1)
+	searchStyle           = lipgloss.NewStyle().Foreground(frostCyan).Background(nord0).Bold(true)
+	searchTextStyle       = lipgloss.NewStyle().Foreground(nord5).Background(nord0)
+	cursorStyle           = lipgloss.NewStyle().Foreground(auroraYellow).Background(nord0).Bold(true)
+	panelStyle            = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(frostBlue).Background(nord0).Foreground(nord5)
+	rowStyle              = lipgloss.NewStyle().Background(nord0).Foreground(nord5)
+	selectedRowStyle      = lipgloss.NewStyle().Background(frostBlue).Foreground(nord0).Bold(true)
+	favoriteStyle         = lipgloss.NewStyle().Foreground(auroraGreen).Bold(true)
+	selectedFavoriteStyle = lipgloss.NewStyle().Foreground(nord0).Background(frostBlue).Bold(true)
+	matchStyle            = lipgloss.NewStyle().Foreground(auroraYellow).Bold(true)
+	selectedMatchStyle    = lipgloss.NewStyle().Foreground(nord0).Background(frostBlue).Bold(true).Underline(true)
+	errorStyle            = lipgloss.NewStyle().Foreground(readableRed).Background(nord0).Bold(true)
+	footerStyle           = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(frostBlue).Background(nord1).Foreground(nord5).Padding(0, 1)
+	footerTextStyle       = lipgloss.NewStyle().Foreground(nord5).Background(nord1)
+	helpShortcutStyle     = lipgloss.NewStyle().Foreground(frostBlue).Bold(true)
+	helpSearchStyle       = lipgloss.NewStyle().Foreground(auroraGreen).Bold(true)
+	helpFavoriteStyle     = lipgloss.NewStyle().Foreground(auroraYellow).Bold(true)
+	helpErrorStyle        = lipgloss.NewStyle().Foreground(readableRed).Bold(true)
 )
 
 // A one-cell-high terminal approximation of the four-stop aurora gradient.
