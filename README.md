@@ -121,11 +121,9 @@ Settings are optional and loaded on startup; old favorites-only files still work
 
 ## Application Discovery
 
-The launcher automatically scans the following directories for `.desktop` files:
+The launcher scans the `applications/` subdirectory of each absolute path in the colon-separated `XDG_DATA_DIRS` environment variable, in order. If unset or empty, it defaults to `/usr/local/share:/usr/share`. Relative and empty entries are ignored, and repeated directories are scanned only once.
 
-- `/usr/share/applications/` (system applications)
-- `/usr/local/share/applications/` (locally installed applications)
-- `~/.local/share/applications/` (user applications)
+It also scans `~/.local/share/applications/` for user applications, preserving user overrides. Flatpak, Snap, and custom installations are discovered when their data directories are included in `XDG_DATA_DIRS`.
 
 Applications with `NoDisplay=true` are automatically filtered out.
 

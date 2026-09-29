@@ -20,11 +20,8 @@ type Scanner struct {
 // NewScanner creates a new Scanner with default scan paths
 func NewScanner() *Scanner {
 	return &Scanner{
-		scanPaths: []string{
-			"/usr/share/applications",
-			"/usr/local/share/applications",
-		},
-		logger: logging.GetGlobalLogger(),
+		scanPaths: defaultScanPaths(),
+		logger:    logging.GetGlobalLogger(),
 	}
 }
 
