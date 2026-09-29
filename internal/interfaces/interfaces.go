@@ -1,14 +1,21 @@
 package interfaces
 
+import "context"
+
 // Application represents an installed application with its metadata
 type Application struct {
-	Name        string
-	Exec        string
-	Icon        string
-	Comment     string
-	Categories  []string
-	DesktopFile string
-	IsFavorite  bool
+	Name          string
+	Exec          string
+	Icon          string
+	Comment       string
+	GenericName   string
+	Keywords      []string
+	Categories    []string
+	Terminal      bool
+	Path          string
+	StartupNotify bool
+	DesktopFile   string
+	IsFavorite    bool
 }
 
 // SearchResult represents a fuzzy search result with scoring information
@@ -21,7 +28,9 @@ type SearchResult struct {
 // ApplicationScanner interface for discovering and managing applications
 type ApplicationScanner interface {
 	ScanApplications() ([]Application, error)
+	ScanApplicationsContext(ctx context.Context) ([]Application, error)
 	RefreshApplications() error
+	RefreshApplicationsContext(ctx context.Context) error
 }
 
 // FuzzySearcher interface for fuzzy search functionality

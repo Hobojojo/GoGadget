@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -32,8 +34,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case initMsg:
-		// Initialize with favorites or all applications
 		m.updateFilteredApps()
+		if m.scanner != nil {
+			m.isRefreshing = true
+			return m, m.refreshApplications()
+		}
 		return m, nil
 
 	case launchMsg:
@@ -57,6 +62,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case launchSuccessMsg:
 		// Application launched successfully, exit the launcher
+		if m.cancelScan != nil {
+			m.cancelScan()
+		}
 		return m, tea.Quit
 
 	case launchErrorMsg:
@@ -72,6 +80,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If the error is not recoverable, we should exit
 		if !recovery.CanContinue {
+			if m.cancelScan != nil {
+				m.cancelScan()
+			}
 			return m, tea.Quit
 		}
 
@@ -136,6 +147,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case refreshCompleteMsg:
+		if m.cancelScan != nil {
+			m.cancelScan()
+			m.cancelScan = nil
+		}
 		m.isRefreshing = false
 		if msg.err != nil {
 			// Handle refresh error
@@ -155,6 +170,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
+			if m.cancelScan != nil {
+				m.cancelScan()
+			}
 			return m, tea.Quit
 
 		case "?":
@@ -253,11 +271,22 @@ func (m *Model) toggleFavorite(app interfaces.Application) tea.Cmd {
 	}
 }
 
-// refreshApplications creates a command to refresh the application list
+// refreshApplications starts a bounded scan without blocking the TUI on slow I/O.
 func (m *Model) refreshApplications() tea.Cmd {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	m.cancelScan = cancel
+	scanner := m.scanner
 	return func() tea.Msg {
-		apps, err := m.scanner.ScanApplications()
-		return refreshCompleteMsg{apps: apps, err: err}
+		results := make(chan refreshCompleteMsg, 1)
+		go func() {
+			apps, err := scanner.ScanApplicationsContext(ctx)
+			results <- refreshCompleteMsg{apps: apps, err: err}
+		}()
+		select {
+		case msg := <-results:
+			return msg
+		case <-ctx.Done():
+			return refreshCompleteMsg{err: ctx.Err()}
+		}
 	}
 }
-

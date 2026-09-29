@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strconv"
 	"strings"
@@ -11,17 +12,31 @@ import (
 
 // DesktopEntry represents a parsed .desktop file
 type DesktopEntry struct {
-	Name       string
-	Exec       string
-	Icon       string
-	Comment    string
-	Categories []string
-	NoDisplay  bool
-	Type       string
+	Name          string
+	Exec          string
+	Icon          string
+	Comment       string
+	GenericName   string
+	Keywords      []string
+	Categories    []string
+	NoDisplay     bool
+	Hidden        bool
+	Terminal      bool
+	Path          string
+	StartupNotify bool
+	Type          string
 }
 
-// ParseDesktopFile parses a .desktop file and returns a DesktopEntry
+// ParseDesktopFile parses a .desktop file and returns a DesktopEntry.
 func ParseDesktopFile(filePath string) (*DesktopEntry, error) {
+	return ParseDesktopFileContext(context.Background(), filePath)
+}
+
+// ParseDesktopFileContext checks for cancellation while reading a desktop file.
+func ParseDesktopFileContext(ctx context.Context, filePath string) (*DesktopEntry, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -33,6 +48,9 @@ func ParseDesktopFile(filePath string) (*DesktopEntry, error) {
 	inDesktopEntry := false
 
 	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		line := strings.TrimSpace(scanner.Text())
 
 		// Skip empty lines and comments
@@ -75,18 +93,20 @@ func ParseDesktopFile(filePath string) (*DesktopEntry, error) {
 			entry.Icon = value
 		case "Comment":
 			entry.Comment = value
+		case "GenericName":
+			entry.GenericName = value
+		case "Path":
+			entry.Path = value
+		case "Terminal":
+			entry.Terminal, _ = strconv.ParseBool(value)
+		case "Hidden":
+			entry.Hidden, _ = strconv.ParseBool(value)
+		case "StartupNotify":
+			entry.StartupNotify, _ = strconv.ParseBool(value)
+		case "Keywords":
+			entry.Keywords = splitDesktopList(value)
 		case "Categories":
-			if value != "" {
-				entry.Categories = strings.Split(value, ";")
-				// Remove empty strings from categories
-				filtered := make([]string, 0, len(entry.Categories))
-				for _, cat := range entry.Categories {
-					if strings.TrimSpace(cat) != "" {
-						filtered = append(filtered, strings.TrimSpace(cat))
-					}
-				}
-				entry.Categories = filtered
-			}
+			entry.Categories = splitDesktopList(value)
 		case "NoDisplay":
 			if noDisplay, err := strconv.ParseBool(value); err == nil {
 				entry.NoDisplay = noDisplay
@@ -100,19 +120,37 @@ func ParseDesktopFile(filePath string) (*DesktopEntry, error) {
 		return nil, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return entry, nil
+}
+
+func splitDesktopList(value string) []string {
+	var result []string
+	for _, part := range strings.Split(value, ";") {
+		if part = strings.TrimSpace(part); part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }
 
 // ToApplication converts a DesktopEntry to an Application struct
 func (de *DesktopEntry) ToApplication(desktopFilePath string) interfaces.Application {
 	return interfaces.Application{
-		Name:        de.Name,
-		Exec:        de.Exec,
-		Icon:        de.Icon,
-		Comment:     de.Comment,
-		Categories:  de.Categories,
-		DesktopFile: desktopFilePath,
-		IsFavorite:  false, // Will be set by config manager
+		Name:          de.Name,
+		Exec:          de.Exec,
+		Icon:          de.Icon,
+		Comment:       de.Comment,
+		GenericName:   de.GenericName,
+		Keywords:      de.Keywords,
+		Categories:    de.Categories,
+		Terminal:      de.Terminal,
+		Path:          de.Path,
+		StartupNotify: de.StartupNotify,
+		DesktopFile:   desktopFilePath,
+		IsFavorite:    false, // Will be set by config manager
 	}
 }
 
@@ -129,7 +167,7 @@ func (de *DesktopEntry) IsValidApplication() bool {
 	}
 
 	// Skip if NoDisplay is true
-	if de.NoDisplay {
+	if de.NoDisplay || de.Hidden {
 		return false
 	}
 

@@ -43,7 +43,7 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 		if len(matches) == 0 {
 			// Metadata hits have no name positions to highlight.
 			found := false
-			for _, text := range append([]string{item.Comment}, item.Categories...) {
+			for _, text := range append(append([]string{item.Comment, item.GenericName}, item.Categories...), item.Keywords...) {
 				metadataScore, metadataMatches := f.calculateScore(queryLower, strings.ToLower(text))
 				if len(metadataMatches) > 0 && (!found || metadataScore > score) {
 					score, found = metadataScore, true

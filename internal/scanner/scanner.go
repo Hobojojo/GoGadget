@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,15 +13,13 @@ import (
 
 // Scanner implements the ApplicationScanner interface
 type Scanner struct {
-	applications []interfaces.Application
-	scanPaths    []string
-	logger       *logging.Logger
+	scanPaths []string
+	logger    *logging.Logger
 }
 
 // NewScanner creates a new Scanner with default scan paths
 func NewScanner() *Scanner {
 	return &Scanner{
-		applications: make([]interfaces.Application, 0),
 		scanPaths: []string{
 			"/usr/share/applications",
 			"/usr/local/share/applications",
@@ -32,14 +31,18 @@ func NewScanner() *Scanner {
 // NewScannerWithPaths creates a new Scanner with custom scan paths
 func NewScannerWithPaths(paths []string) *Scanner {
 	return &Scanner{
-		applications: make([]interfaces.Application, 0),
-		scanPaths:    paths,
-		logger:       logging.GetGlobalLogger(),
+		scanPaths: paths,
+		logger:    logging.GetGlobalLogger(),
 	}
 }
 
-// ScanApplications discovers applications from desktop files
+// ScanApplications discovers applications from desktop files.
 func (s *Scanner) ScanApplications() ([]interfaces.Application, error) {
+	return s.ScanApplicationsContext(context.Background())
+}
+
+// ScanApplicationsContext stops scanning when ctx is cancelled.
+func (s *Scanner) ScanApplicationsContext(ctx context.Context) ([]interfaces.Application, error) {
 	var applications []interfaces.Application
 
 	// Create a copy of scan paths to avoid modifying the original slice
@@ -68,8 +71,14 @@ func (s *Scanner) ScanApplications() ([]interfaces.Application, error) {
 	totalFound := 0
 
 	for _, scanPath := range scanPaths {
-		apps, err := s.scanDirectory(scanPath)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		apps, err := s.scanDirectory(ctx, scanPath)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			// Collect scan errors but continue with other directories
 			scanErrors = append(scanErrors, errors.NewScanError("failed to scan directory", err).
 				WithContext("directory", scanPath))
@@ -92,10 +101,13 @@ func (s *Scanner) ScanApplications() ([]interfaces.Application, error) {
 		s.logger.Info("Application scan completed: total_found=%d, failed_directories=%d", totalFound, len(scanErrors))
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// If we have scan errors but found some applications, return partial results
 	if len(scanErrors) > 0 && len(applications) > 0 {
 		// Return applications with a warning about partial scan
-		s.applications = applications
 		return applications, errors.NewScanError("partial scan completed", nil).
 			WithContext("failed_directories", len(scanErrors)).
 			WithContext("found_applications", len(applications))
@@ -109,18 +121,22 @@ func (s *Scanner) ScanApplications() ([]interfaces.Application, error) {
 	// Remove duplicates (prefer user applications over system ones)
 	applications = s.removeDuplicates(applications)
 
-	s.applications = applications
 	return applications, nil
 }
 
-// RefreshApplications rescans for newly installed applications
+// RefreshApplications rescans for newly installed applications.
 func (s *Scanner) RefreshApplications() error {
-	_, err := s.ScanApplications()
+	return s.RefreshApplicationsContext(context.Background())
+}
+
+// RefreshApplicationsContext rescans with cancellation support.
+func (s *Scanner) RefreshApplicationsContext(ctx context.Context) error {
+	_, err := s.ScanApplicationsContext(ctx)
 	return err
 }
 
 // scanDirectory scans a single directory for .desktop files
-func (s *Scanner) scanDirectory(dirPath string) ([]interfaces.Application, error) {
+func (s *Scanner) scanDirectory(ctx context.Context, dirPath string) ([]interfaces.Application, error) {
 	var applications []interfaces.Application
 
 	// Check if directory exists
@@ -129,6 +145,9 @@ func (s *Scanner) scanDirectory(dirPath string) ([]interfaces.Application, error
 	}
 
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil {
 			// Skip files we can't access
 			return nil
@@ -140,8 +159,11 @@ func (s *Scanner) scanDirectory(dirPath string) ([]interfaces.Application, error
 		}
 
 		// Parse the desktop file
-		entry, err := ParseDesktopFile(path)
+		entry, err := ParseDesktopFileContext(ctx, path)
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			// Skip invalid desktop files but don't treat as fatal error
 			return nil
 		}

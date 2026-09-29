@@ -46,8 +46,18 @@ func (l *Launcher) LaunchApplication(app interfaces.Application) error {
 			WithContext("command", command)
 	}
 
+	if app.Terminal {
+		terminal, err := terminalEmulator()
+		if err != nil {
+			return errors.NewLaunchError("terminal emulator not found", err).WithContext("app_name", app.Name)
+		}
+		args = append([]string{"-e", command}, args...)
+		command = terminal
+	}
+
 	// Create the command
 	cmd := exec.Command(command, args...)
+	cmd.Dir = app.Path
 
 	// Set up the command environment
 	cmd.Env = os.Environ()
@@ -224,6 +234,17 @@ func (l *Launcher) ValidateApplication(app interfaces.Application) error {
 		return errors.NewLaunchError("command not found in PATH", err).
 			WithContext("app_name", app.Name).
 			WithContext("command", command)
+	}
+	if app.Path != "" {
+		info, err := os.Stat(app.Path)
+		if err != nil || !info.IsDir() {
+			return errors.NewLaunchError("invalid working directory", err).WithContext("path", app.Path)
+		}
+	}
+	if app.Terminal {
+		if _, err := terminalEmulator(); err != nil {
+			return errors.NewLaunchError("terminal emulator not found", err).WithContext("app_name", app.Name)
+		}
 	}
 
 	return nil

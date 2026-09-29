@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 
 	"tui-app-launcher/internal/errors"
@@ -27,6 +28,7 @@ type Model struct {
 	errorMessage  string
 	errorRecovery *errors.ErrorRecovery
 	isRefreshing  bool
+	cancelScan    context.CancelFunc
 }
 
 // NewModel creates a new TUI model
@@ -143,7 +145,7 @@ func (m *Model) SetApplications(apps []interfaces.Application) {
 
 // Init initializes the TUI model
 func (m Model) Init() tea.Cmd {
-	// Load favorites and set up initial state
+	// Start the initial scan after the interface appears.
 	return tea.Batch(
 		tea.EnterAltScreen,
 		func() tea.Msg {

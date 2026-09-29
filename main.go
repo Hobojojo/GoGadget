@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"tui-app-launcher/internal/config"
-	"tui-app-launcher/internal/interfaces"
 	"tui-app-launcher/internal/launcher"
 	"tui-app-launcher/internal/logging"
 	"tui-app-launcher/internal/scanner"
@@ -39,19 +38,8 @@ func main() {
 	appScanner := scanner.NewScanner()
 	appLauncher := launcher.NewLauncher()
 
-	// Load applications
-	applications, err := appScanner.ScanApplications()
-	if err != nil {
-		logging.Error("Error scanning applications: %v", err)
-		// Create empty slice for now
-		applications = make([]interfaces.Application, 0)
-	}
-
 	// Create TUI model
 	model := tui.NewModel(fuzzySearcher, configManager, appLauncher, appScanner)
-
-	// Set applications in the model
-	(&model).SetApplications(applications)
 
 	// Create Bubble Tea program
 	program := tea.NewProgram(model, tea.WithAltScreen())
