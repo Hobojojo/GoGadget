@@ -15,6 +15,7 @@ type Model struct {
 	filteredApps  []interfaces.Application
 	searchQuery   string
 	selectedIndex int
+	scrollOffset  int
 	fuzzySearcher interfaces.FuzzySearcher
 	configManager interfaces.ConfigManager
 	launcher      interfaces.ApplicationLauncher
@@ -62,16 +63,16 @@ func (m *Model) truncateText(text string, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
 	}
-	
+
 	runes := []rune(text)
 	if len(runes) <= maxWidth {
 		return text
 	}
-	
+
 	if maxWidth <= 3 {
 		return strings.Repeat(".", maxWidth)
 	}
-	
+
 	return string(runes[:maxWidth-3]) + "..."
 }
 
@@ -80,37 +81,37 @@ func (m *Model) wrapText(text string, maxWidth int) []string {
 	if maxWidth <= 0 {
 		return []string{}
 	}
-	
+
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return []string{""}
 	}
-	
+
 	var lines []string
 	var currentLine strings.Builder
-	
+
 	for _, word := range words {
 		// If adding this word would exceed the width, start a new line
 		if currentLine.Len() > 0 && currentLine.Len()+1+len(word) > maxWidth {
 			lines = append(lines, currentLine.String())
 			currentLine.Reset()
 		}
-		
+
 		// If the word itself is too long, truncate it
 		if len(word) > maxWidth {
 			word = m.truncateText(word, maxWidth)
 		}
-		
+
 		if currentLine.Len() > 0 {
 			currentLine.WriteString(" ")
 		}
 		currentLine.WriteString(word)
 	}
-	
+
 	if currentLine.Len() > 0 {
 		lines = append(lines, currentLine.String())
 	}
-	
+
 	return lines
 }
 
@@ -152,7 +153,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		
+
 		// Ensure minimum dimensions
 		if m.width < m.getMinWidth() {
 			m.width = m.getMinWidth()
@@ -160,13 +161,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.height < m.getMinHeight() {
 			m.height = m.getMinHeight()
 		}
-		
-		// Reset selection if it's out of bounds due to height change
-		maxItems := m.height - 7 // Reserve space for header, search, footer
-		if m.selectedIndex >= maxItems && len(m.filteredApps) > maxItems {
-			m.selectedIndex = maxItems - 1
-		}
-		
+
+		// Resizing must preserve the selected application, not select another row.
+		m.ensureSelectionVisible()
+
 		return m, nil
 
 	case initMsg:
@@ -298,6 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedIndex = len(m.filteredApps) - 1
 				}
 			}
+			m.ensureSelectionVisible()
 			return m, nil
 
 		case "down":
@@ -307,6 +306,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedIndex = 0
 				}
 			}
+			m.ensureSelectionVisible()
 			return m, nil
 
 		case "enter":
@@ -417,7 +417,7 @@ func (m Model) View() string {
 	cursor := "█" // Block cursor
 	searchPrefix := "Search: "
 	maxSearchWidth := m.width - len("│ ") - len(searchPrefix) - len("│") - 1
-	
+
 	searchDisplay := m.searchQuery
 	if maxSearchWidth > 1 {
 		// If search query is too long, show the end part with ellipsis
@@ -425,7 +425,7 @@ func (m Model) View() string {
 			searchDisplay = "..." + searchDisplay[len(searchDisplay)-(maxSearchWidth-4):]
 		}
 		searchDisplay += cursor
-		
+
 		// Ensure we don't exceed the available width
 		if len(searchDisplay) > maxSearchWidth {
 			searchDisplay = m.truncateText(searchDisplay, maxSearchWidth)
@@ -433,7 +433,7 @@ func (m Model) View() string {
 	} else {
 		searchDisplay = cursor
 	}
-	
+
 	searchLine := fmt.Sprintf("│ %s%s", searchPrefix, searchDisplay)
 	padding = m.width - len(searchLine) - 1
 	if padding > 0 {
@@ -444,12 +444,12 @@ func (m Model) View() string {
 
 	s.WriteString("├" + strings.Repeat("─", m.width-2) + "┤\n")
 
-	// Application list
-	maxItems := m.height - 7 // Reserve space for header, search, footer
-	for i, app := range m.filteredApps {
-		if i >= maxItems {
-			break
-		}
+	// Render only the visible window, including when an error reduces its height.
+	m.ensureSelectionVisible()
+	maxItems := m.visibleRows()
+	end := min(len(m.filteredApps), m.scrollOffset+maxItems)
+	for i := m.scrollOffset; i < end; i++ {
+		app := m.filteredApps[i]
 
 		prefix := "  "
 		isSelected := i == m.selectedIndex
@@ -466,17 +466,17 @@ func (m Model) View() string {
 
 		// Calculate available width for the application name
 		maxNameWidth := m.getMaxAppNameWidth()
-		
+
 		// Get highlighted name if there's a search query
 		displayName := app.Name
 		plainName := app.Name
-		
+
 		// Truncate name if it's too long
 		if len(plainName) > maxNameWidth {
 			plainName = m.truncateText(plainName, maxNameWidth)
 			displayName = plainName
 		}
-		
+
 		if m.searchQuery != "" && len(plainName) == len(app.Name) {
 			// Only highlight if we didn't truncate
 			matches := m.fuzzySearcher.GetMatchPositions(m.searchQuery, app.Name)
@@ -508,7 +508,7 @@ func (m Model) View() string {
 	}
 
 	// Fill remaining space
-	for i := len(m.filteredApps); i < maxItems; i++ {
+	for i := end - m.scrollOffset; i < maxItems; i++ {
 		s.WriteString("│" + strings.Repeat(" ", m.width-2) + "│\n")
 	}
 
@@ -523,7 +523,7 @@ func (m Model) View() string {
 		if maxErrorWidth > 0 {
 			errorMsg = m.truncateText(errorMsg, maxErrorWidth)
 		}
-		
+
 		errorLine := fmt.Sprintf("│ \033[1;31mError:\033[0m %s", errorMsg)
 		// Calculate padding without ANSI codes
 		plainErrorLine := fmt.Sprintf("│ Error: %s", errorMsg)
@@ -543,7 +543,7 @@ func (m Model) View() string {
 		if m.width < 40 {
 			footer = "│ ?: Help  Esc: Exit"
 		}
-		
+
 		padding = m.width - len(footer) - 1
 		if padding > 0 {
 			footer += strings.Repeat(" ", padding)
@@ -568,7 +568,7 @@ func (m Model) View() string {
 		if m.width < 40 {
 			footer = "│ ?: Help  Esc: Exit"
 		}
-		
+
 		padding = m.width - len(footer) - 1
 		if padding > 0 {
 			footer += strings.Repeat(" ", padding)
@@ -588,7 +588,7 @@ func (m Model) renderHelp() string {
 
 	// Header
 	s.WriteString("┌" + strings.Repeat("─", m.width-2) + "┐\n")
-	
+
 	// Title
 	title := "│ TUI App Launcher - Help"
 	padding := m.width - len(title) - 1
@@ -597,7 +597,7 @@ func (m Model) renderHelp() string {
 	}
 	title += "│\n"
 	s.WriteString(title)
-	
+
 	s.WriteString("├" + strings.Repeat("─", m.width-2) + "┤\n")
 
 	// Help content
@@ -633,13 +633,13 @@ func (m Model) renderHelp() string {
 
 	// Calculate available height for content
 	availableHeight := m.height - 4 // Header, separator, footer
-	
+
 	// Display help lines with proper padding
 	for i, line := range helpLines {
 		if i >= availableHeight {
 			break
 		}
-		
+
 		helpLine := "│ " + line
 		padding = m.width - len(helpLine) - 1
 		if padding > 0 {
@@ -663,7 +663,7 @@ func (m Model) renderHelp() string {
 	}
 	footer += "│\n"
 	s.WriteString(footer)
-	
+
 	s.WriteString("└" + strings.Repeat("─", m.width-2) + "┘")
 
 	return s.String()
@@ -709,6 +709,7 @@ func (m *Model) updateFilteredApps() {
 	if m.selectedIndex >= len(m.filteredApps) {
 		m.selectedIndex = 0
 	}
+	m.ensureSelectionVisible()
 }
 
 // highlightMatches highlights matching characters in the text

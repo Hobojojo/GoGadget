@@ -40,7 +40,8 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 
 	for _, item := range items {
 		score, matches := f.calculateScore(queryLower, strings.ToLower(item.Name))
-		if score > 0 {
+		// A complete match may have a nonpositive ranking score for long names.
+		if len(matches) > 0 {
 			results = append(results, interfaces.SearchResult{
 				Application: item,
 				Score:       score,

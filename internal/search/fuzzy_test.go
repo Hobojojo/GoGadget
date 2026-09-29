@@ -79,7 +79,7 @@ func TestFuzzySearcher_Search(t *testing.T) {
 		{
 			name:          "Single character",
 			query:         "t",
-			expectedCount: 2,
+			expectedCount: 4,
 			expectedFirst: "Terminal", // Should score higher due to start position
 			description:   "Single character should match multiple apps",
 		},
@@ -183,7 +183,7 @@ func TestFuzzySearcher_MatchPositions(t *testing.T) {
 			name:            "Scattered matches",
 			query:           "fx",
 			appName:         "Firefox",
-			expectedMatches: []int{0, 5}, // F-irefo-x
+			expectedMatches: []int{0, 6}, // F-irefo-x
 		},
 	}
 
@@ -226,15 +226,15 @@ func TestFuzzySearcher_EdgeCases(t *testing.T) {
 		description string
 	}{
 		{
-			name:        "Empty app name",
+			name:        "Empty name does not match but named application does",
 			query:       "test",
-			expectCount: 0,
+			expectCount: 1,
 			description: "Should handle empty app names gracefully",
 		},
 		{
-			name:        "Single character app",
+			name:        "Single character matches both names containing it",
 			query:       "a",
-			expectCount: 1,
+			expectCount: 2,
 			description: "Should match single character apps",
 		},
 		{

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 
 	"tui-app-launcher/internal/errors"
 	"tui-app-launcher/internal/logging"
@@ -17,6 +19,7 @@ type Config struct {
 
 // Manager implements the ConfigManager interface
 type Manager struct {
+	mu         sync.Mutex
 	configPath string
 	configFile string
 	config     *Config
@@ -110,6 +113,9 @@ func (m *Manager) saveConfig() error {
 
 // LoadFavorites loads the user's favorite applications
 func (m *Manager) LoadFavorites() ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if err := m.loadConfig(); err != nil {
 		// Check if this is a recoverable error
 		if launcherErr, ok := err.(*errors.LauncherError); ok && launcherErr.IsRecoverable() {
@@ -118,12 +124,15 @@ func (m *Manager) LoadFavorites() ([]string, error) {
 		}
 		return nil, err
 	}
-	return m.config.Favorites, nil
+	return slices.Clone(m.config.Favorites), nil
 }
 
 // SaveFavorites saves the user's favorite applications
 func (m *Manager) SaveFavorites(favorites []string) error {
-	m.config.Favorites = favorites
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.config.Favorites = slices.Clone(favorites)
 	if err := m.saveConfig(); err != nil {
 		return errors.NewConfigError("failed to save favorites", err).
 			WithContext("favorites_count", len(favorites))
@@ -133,6 +142,9 @@ func (m *Manager) SaveFavorites(favorites []string) error {
 
 // AddFavorite adds an application to favorites
 func (m *Manager) AddFavorite(appName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	// Check if already in favorites
 	for _, fav := range m.config.Favorites {
 		if fav == appName {
@@ -161,6 +173,9 @@ func (m *Manager) AddFavorite(appName string) error {
 
 // RemoveFavorite removes an application from favorites
 func (m *Manager) RemoveFavorite(appName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	// Find and remove the favorite
 	for i, fav := range m.config.Favorites {
 		if fav == appName {
@@ -190,6 +205,9 @@ func (m *Manager) RemoveFavorite(appName string) error {
 
 // IsFavorite checks if an application is in favorites
 func (m *Manager) IsFavorite(appName string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for _, fav := range m.config.Favorites {
 		if fav == appName {
 			return true
@@ -200,6 +218,9 @@ func (m *Manager) IsFavorite(appName string) bool {
 
 // SetConfigPath sets a custom config path for testing
 func (m *Manager) SetConfigPath(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.configPath = path
 	m.configFile = filepath.Join(path, "config.json")
 }
