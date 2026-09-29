@@ -26,7 +26,7 @@ func (m Model) View() string {
 		lines = append(lines, rowStyle.Copy().Width(inner-2).Render(""))
 	}
 
-	parts := []string{m.renderHeader(inner), auroraRule(inner), m.renderSearch(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...))}
+	parts := []string{m.renderHeader(inner), dividerRule(inner), m.renderSearch(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...))}
 	if m.errorMessage != "" {
 		label := errorStyle.Render("Error:")
 		message := m.truncateText(m.errorMessage, inner-10)
@@ -58,11 +58,10 @@ func (m Model) title() string {
 
 func (m Model) renderHeader(width int) string {
 	if m.height < 14 {
-		return headerTextStyle.Copy().Background(nord1).Width(width).Render(" " + m.truncateText(m.title(), width-2))
+		return headerTextStyle.Copy().Background(backgroundColor).Width(width).Render(" " + m.truncateText(m.title(), width-2))
 	}
-	// Terminal cells cannot reproduce an inset box-shadow; a deep-blue lower edge
-	// inside the banner gives it the same visual weight without adding a row.
-	text := headerTextStyle.Copy().Background(nord1).Render(m.truncateText(m.title(), width-5))
+	// Keep the title accent on the same black surface as the banner.
+	text := headerTextStyle.Copy().Background(backgroundColor).Render(m.truncateText(m.title(), width-5))
 	return headerStyle.Copy().Width(width-2).Render(headerAccentStyle.Render("▍") + " " + text)
 }
 
@@ -196,16 +195,16 @@ func (m Model) renderHelp() string {
 			lines = append(lines, m.renderHelpLine(line, contentWidth))
 		}
 	}
-	parts := []string{m.renderHelpHeader(inner), auroraRule(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)), m.renderFooter(inner, true)}
+	parts := []string{m.renderHelpHeader(inner), dividerRule(inner), panelStyle.Copy().Width(inner-2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)), m.renderFooter(inner, true)}
 	return containerStyle.Copy().Width(m.width-2).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 }
 
 func (m Model) renderHelpHeader(width int) string {
 	label := m.truncateText("TUI App Launcher - Help", width-5)
 	if m.height < 14 {
-		return headerTextStyle.Copy().Background(nord1).Width(width).Render(" " + label)
+		return headerTextStyle.Copy().Background(backgroundColor).Width(width).Render(" " + label)
 	}
-	return headerStyle.Copy().Width(width-2).Render(headerAccentStyle.Render("▍") + " " + headerTextStyle.Copy().Background(nord1).Render(label))
+	return headerStyle.Copy().Width(width-2).Render(headerAccentStyle.Render("▍") + " " + headerTextStyle.Copy().Background(backgroundColor).Render(label))
 }
 
 func (m Model) renderHelpLine(text string, width int) string {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/muesli/termenv"
 )
 
-func TestNordViewsFitTerminal(t *testing.T) {
+func TestBlackViewsFitTerminal(t *testing.T) {
 	for _, size := range []struct{ width, height int }{{40, 10}, {80, 24}, {100, 32}} {
 		m := testModel(t, 35)
 		m.width, m.height = size.width, size.height
@@ -35,7 +36,7 @@ func TestNordViewsFitTerminal(t *testing.T) {
 	}
 }
 
-func TestNordColorStates(t *testing.T) {
+func TestBlackColorStates(t *testing.T) {
 	previous := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(previous)
@@ -44,25 +45,41 @@ func TestNordColorStates(t *testing.T) {
 	m.applications[0].IsFavorite = true
 	m.filteredApps[0].IsFavorite = true
 	m.searchQuery = "App"
-	main := m.View()
-	for _, color := range []string{"129;161;193", "163;190;140", "235;203;139", "191;97;105"} {
-		if !strings.Contains(main, color) {
-			t.Fatalf("missing Nord color %s in main view: %q", color, main)
+
+	assertBlack := func(view string) {
+		t.Helper()
+		backgrounds := regexp.MustCompile(`48;2;(\d+;\d+;\d+)`).FindAllStringSubmatch(view, -1)
+		if len(backgrounds) == 0 {
+			t.Fatal("view did not set an explicit black background")
+		}
+		for _, color := range backgrounds {
+			if color[1] != "0;0;0" {
+				t.Fatalf("found a non-black background: %s", color[1])
+			}
+		}
+		if strings.Contains(view, "129;161;193") || strings.Contains(view, "136;192;208") {
+			t.Fatal("teal and blue chrome remain in the black theme")
 		}
 	}
+
+	assertBlack(m.View())
 	selected := m.renderApplication(0, 40)
-	if !strings.Contains(selected, "38;2;46;52;64") || strings.Contains(selected, "38;2;163;190;140") || strings.Contains(selected, "38;2;235;203;139") {
-		t.Fatal("selected row accents must remain legible on the blue background")
+	assertBlack(selected)
+	if !strings.Contains(selected, "255;255;255") || !strings.Contains(stripANSIForTest(selected), "> App") {
+		t.Fatal("selection lost its bright text or indicator")
 	}
 	m.errorMessage = "Example error"
-	if view := m.View(); !strings.Contains(view, "Example error") || !strings.Contains(view, "229;163;169") {
-		t.Fatalf("error label or message lost readable red styling: %q", view)
+	view := m.View()
+	assertBlack(view)
+	if !strings.Contains(view, "Example error") || !strings.Contains(view, "229;163;169") {
+		t.Fatal("error label or message lost readable styling")
 	}
 	m = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	if !m.showHelp {
 		t.Fatal("help key did not open the guide")
 	}
 	help := m.View()
+	assertBlack(help)
 	for _, heading := range []string{"Keyboard Shortcuts:", "Search:", "Favorites:", "Error Handling:"} {
 		if !strings.Contains(help, heading) {
 			t.Fatalf("help missing %s", heading)
