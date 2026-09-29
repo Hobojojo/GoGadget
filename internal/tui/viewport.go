@@ -1,11 +1,16 @@
 package tui
 
-// visibleRows reserves five header rows and three footer rows. Errors use two
-// additional rows. A very short terminal may have no room for application rows.
+// visibleRows accounts for the outer frame, banner, aurora rule, search,
+// bordered list panel and footer. Compact terminals use single-row banners.
 func (m *Model) visibleRows() int {
-	reserved := 8
-	if m.errorMessage != "" {
-		reserved += 2
+	reserved := 12
+	if m.height < 14 {
+		reserved = 8
+	}
+	if m.showHelp {
+		reserved-- // Help has no search field.
+	} else if m.errorMessage != "" {
+		reserved++
 	}
 	return max(0, m.height-reserved)
 }

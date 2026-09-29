@@ -12,6 +12,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-runewidth"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func testModel(t *testing.T, count int) Model {
@@ -142,12 +144,15 @@ func TestTruncatedNameHighlightsVisibleMatches(t *testing.T) {
 	for _, r := range "Café" {
 		m = updateModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
+	profile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(profile)
 	view := m.View()
-	if !strings.Contains(view, "\033[1;33m") || !strings.Contains(view, "...") {
-		t.Fatalf("truncated result lost visible highlight: %q", view)
+	if !strings.Contains(view, "235;203;139") || !strings.Contains(view, "...") {
+		t.Fatalf("truncated result lost Nord match highlight: %q", view)
 	}
 	for _, line := range strings.Split(view, "\n") {
-		if strings.HasPrefix(line, "│") && runewidth.StringWidth(stripANSIForTest(line)) != m.width {
+		if runewidth.StringWidth(stripANSIForTest(line)) != m.width {
 			t.Fatalf("line does not fit %d columns: %q", m.width, line)
 		}
 	}
