@@ -1,6 +1,9 @@
 package interfaces
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Application represents an installed application with its metadata
 type Application struct {
@@ -47,6 +50,26 @@ type ConfigManager interface {
 	AddFavorite(appName string) error
 	RemoveFavorite(appName string) error
 	IsFavorite(appName string) bool
+}
+
+// LaunchRecord tracks successful starts, not process lifetime or exit status.
+type LaunchRecord struct {
+	Count    int       `json:"count"`
+	LastUsed time.Time `json:"last_used"`
+}
+
+// HistoryID avoids collisions between different desktop entries with equal names.
+func (app Application) HistoryID() string {
+	if app.DesktopFile != "" {
+		return app.DesktopFile
+	}
+	return app.Name + "|" + app.Exec
+}
+
+// LaunchHistoryManager is an optional extension of ConfigManager.
+type LaunchHistoryManager interface {
+	LaunchHistory() map[string]LaunchRecord
+	RecordLaunch(Application) error
 }
 
 // ApplicationLauncher interface for launching applications

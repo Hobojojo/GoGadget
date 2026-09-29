@@ -77,9 +77,9 @@ func TestFuzzySearcher_Search(t *testing.T) {
 			description:   "Non-matching query should return no results",
 		},
 		{
-			name:          "Single character",
+			name:          "Single character includes executable matches",
 			query:         "t",
-			expectedCount: 4,
+			expectedCount: 5,          // File Manager now matches nautilus.
 			expectedFirst: "Terminal", // Should score higher due to start position
 			description:   "Single character should match multiple apps",
 		},

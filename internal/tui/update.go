@@ -9,6 +9,7 @@ import (
 
 	"tui-app-launcher/internal/errors"
 	"tui-app-launcher/internal/interfaces"
+	"tui-app-launcher/internal/logging"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -54,6 +55,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return m, func() tea.Msg {
 				return launchErrorMsg{err: err}
+			}
+		}
+		if history, ok := m.configManager.(interfaces.LaunchHistoryManager); ok {
+			if err := history.RecordLaunch(msg.app); err != nil {
+				// The app has already started: a history write must not invite a
+				// second launch or turn success into a launch failure.
+				logging.Error("Failed to record launch history: %v", err)
 			}
 		}
 		return m, func() tea.Msg {

@@ -171,8 +171,9 @@ func (m *Model) updateFilteredApps() {
 			m.filteredApps = m.applications
 		}
 	} else {
-		// Use fuzzy search
+		// Use fuzzy search; history breaks equal-relevance ties.
 		results := m.fuzzySearcher.Search(m.searchQuery, m.applications)
+		m.rankByHistory(results)
 
 		// Separate favorites and non-favorites in search results
 		var favoriteResults []interfaces.Application
@@ -190,6 +191,10 @@ func (m *Model) updateFilteredApps() {
 		m.filteredApps = make([]interfaces.Application, 0, len(results))
 		m.filteredApps = append(m.filteredApps, favoriteResults...)
 		m.filteredApps = append(m.filteredApps, regularResults...)
+	}
+
+	if m.searchQuery == "" {
+		m.rankByHistory(nil)
 	}
 
 	// Reset selection if out of bounds

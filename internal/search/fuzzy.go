@@ -22,7 +22,7 @@ func NewFuzzySearcher() *FuzzySearcher {
 
 // Search performs fuzzy search on applications
 func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []interfaces.SearchResult {
-	if query == "" {
+	if len(strings.Fields(query)) == 0 {
 		// Return all items with zero score when query is empty
 		results := make([]interfaces.SearchResult, len(items))
 		for i, item := range items {
@@ -35,27 +35,37 @@ func (f *FuzzySearcher) Search(query string, items []interfaces.Application) []i
 		return results
 	}
 
-	var results []interfaces.SearchResult
-	queryLower := strings.ToLower(query)
-
+	results := make([]interfaces.SearchResult, 0)
+	tokens := strings.Fields(strings.ToLower(query))
 	for _, item := range items {
-		score, matches := f.calculateScore(queryLower, strings.ToLower(item.Name))
-		if len(matches) == 0 {
-			// Metadata hits have no name positions to highlight.
+		name := strings.ToLower(item.Name)
+		metadata := append([]string{item.Exec, item.Comment, item.GenericName}, item.Categories...)
+		metadata = append(metadata, item.Keywords...)
+		total, complete := 0, true
+		var positions []int
+		for _, token := range tokens {
+			score, matches := f.calculateScore(token, name)
+			if len(matches) > 0 {
+				total += score
+				positions = append(positions, matches...)
+				continue
+			}
 			found := false
-			for _, text := range append(append([]string{item.Comment, item.GenericName}, item.Categories...), item.Keywords...) {
-				metadataScore, metadataMatches := f.calculateScore(queryLower, strings.ToLower(text))
-				if len(metadataMatches) > 0 && (!found || metadataScore > score) {
-					score, found = metadataScore, true
+			for _, text := range metadata {
+				candidate, hits := f.calculateScore(token, strings.ToLower(text))
+				if len(hits) > 0 && (!found || candidate > score) {
+					score, found = candidate, true
 				}
 			}
-			if found {
-				results = append(results, interfaces.SearchResult{Application: item, Score: score - 1})
+			if !found {
+				complete = false
+				break
 			}
-			continue
+			total += score - 1 // Prefer name matches over metadata matches.
 		}
-		// A complete match may have a nonpositive ranking score for long names.
-		results = append(results, interfaces.SearchResult{Application: item, Score: score, Matches: matches})
+		if complete {
+			results = append(results, interfaces.SearchResult{Application: item, Score: total, Matches: uniquePositions(positions)})
+		}
 	}
 
 	// Sort results by score (descending), then by name (ascending)
@@ -192,9 +202,24 @@ func (f *FuzzySearcher) GetMatchPositions(query, target string) []int {
 		return []int{}
 	}
 
-	queryLower := strings.ToLower(query)
-	targetLower := strings.ToLower(target)
+	var positions []int
+	for _, token := range strings.Fields(strings.ToLower(query)) {
+		_, matches := f.calculateScore(token, strings.ToLower(target))
+		positions = append(positions, matches...)
+	}
+	return uniquePositions(positions)
+}
 
-	_, matches := f.calculateScore(queryLower, targetLower)
-	return matches
+func uniquePositions(positions []int) []int {
+	if len(positions) == 0 {
+		return []int{}
+	}
+	sort.Ints(positions)
+	unique := positions[:0]
+	for _, pos := range positions {
+		if len(unique) == 0 || unique[len(unique)-1] != pos {
+			unique = append(unique, pos)
+		}
+	}
+	return unique
 }

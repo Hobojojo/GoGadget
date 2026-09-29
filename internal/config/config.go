@@ -9,12 +9,14 @@ import (
 	"sync"
 
 	"tui-app-launcher/internal/errors"
+	"tui-app-launcher/internal/interfaces"
 	"tui-app-launcher/internal/logging"
 )
 
 // Config represents the application configuration structure
 type Config struct {
-	Favorites []string `json:"favorites"`
+	Favorites     []string                           `json:"favorites"`
+	LaunchHistory map[string]interfaces.LaunchRecord `json:"launch_history,omitempty"`
 }
 
 // Manager implements the ConfigManager interface

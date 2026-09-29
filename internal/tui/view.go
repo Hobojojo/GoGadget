@@ -24,20 +24,21 @@ func (m Model) renderMain() string {
 	rows := m.visibleRows()
 	m.ensureSelectionVisible()
 
+	listWidth := m.listWidth(inner)
 	lines := make([]string, 0, rows)
 	shift := m.entranceRows()
 	for i := 0; i < shift; i++ {
-		lines = append(lines, rowStyle.Copy().Width(inner-2).Render(""))
+		lines = append(lines, rowStyle.Copy().Width(listWidth).Render(""))
 	}
 	end := min(len(m.filteredApps), m.scrollOffset+rows-shift)
 	for i := m.scrollOffset; i < end; i++ {
-		lines = append(lines, m.renderApplication(i, inner-2))
+		lines = append(lines, m.renderApplication(i, listWidth))
 	}
 	for len(lines) < rows {
-		lines = append(lines, rowStyle.Copy().Width(inner-2).Render(""))
+		lines = append(lines, rowStyle.Copy().Width(listWidth).Render(""))
 	}
 
-	parts := []string{m.renderHeader(inner), dividerRule(inner), m.renderSearch(inner), panelStyle.Copy().Width(inner - 2).Render(lipgloss.JoinVertical(lipgloss.Left, lines...))}
+	parts := []string{m.renderHeader(inner), dividerRule(inner), m.renderSearch(inner), m.renderListPanel(lines, inner)}
 	if m.errorMessage != "" {
 		label := errorStyle.Render("Error:")
 		offset := min(6, max(0, int(m.animations.error.value+0.5)))
@@ -168,7 +169,7 @@ func (m Model) renderHelp() string {
 		"  Esc/Ctrl+C    Exit application",
 		"", "Search:",
 		"  Type any characters to search for applications",
-		"  Search uses fuzzy matching - you don't need exact names",
+		"  Words match names, commands and metadata in any order",
 		"  Clear search to see favorites list",
 		"", "Favorites:",
 		"  Use Tab to add/remove applications from favorites",
