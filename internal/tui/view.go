@@ -110,7 +110,7 @@ func (m Model) renderApplication(index, width int) string {
 	prefix := "  "
 	style := rowStyle
 	if selected {
-		prefix = "> "
+		prefix = selectedIndicatorStyle.Render("▎") + " "
 		style = selectedRowStyle
 	}
 	return style.Copy().Width(width).Render(prefix + name + favorite)
@@ -210,14 +210,8 @@ func (m Model) renderHelpHeader(width int) string {
 func (m Model) renderHelpLine(text string, width int) string {
 	text = m.truncateText(text, width-2)
 	switch text {
-	case "Keyboard Shortcuts:":
-		text = helpShortcutStyle.Render(text)
-	case "Search:":
-		text = helpSearchStyle.Render(text)
-	case "Favorites:":
-		text = helpFavoriteStyle.Render(text)
-	case "Error Handling:":
-		text = helpErrorStyle.Render(text)
+	case "Keyboard Shortcuts:", "Search:", "Favorites:", "Error Handling:":
+		text = helpHeadingStyle.Render(text)
 	}
 	return rowStyle.Copy().Width(width).Render(" " + text)
 }
